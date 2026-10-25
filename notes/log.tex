@@ -1,0 +1,401 @@
+\documentclass{article}
+
+% Language setting
+% Replace `english' with e.g. `spanish' to change the document language
+\usepackage[english]{babel}
+
+% Set page size and margins
+% Replace `letterpaper' with `a4paper' for UK/EU standard size
+\usepackage[letterpaper,top=2cm,bottom=2cm,left=3cm,right=3cm,marginparwidth=1.75cm]{geometry}
+
+% Useful packages
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage[colorlinks=true, allcolors=blue]{hyperref}
+\usepackage{tabularx}
+
+\title{Your Paper}
+\author{You}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Your abstract.
+\end{abstract}
+
+
+\section{21/01/2026 Meeting 1}
+Material discussed:
+\begin{itemize}
+    \item \href{https://arxiv.org/abs/2312.14688}{A Mathematical Guide to Operator Learning}
+    \item \href{https://arxiv.org/abs/2410.02724}{Large Language Models as Markov Chains}
+\end{itemize}
+Notes:
+\begin{itemize}
+    \item First meeting, broad discussion of project direction.
+    \item Choice between ML + PDEs or LLMs + Probability.
+    \item Discussed interesting project at the intersection of probability, PDEs, and transformers. It involves showing a similar relationship between LLMs and Markov chains in continuous-time.
+\end{itemize}
+
+\section{30/01/2026 Meeting 2}
+Material discussed:
+\begin{itemize}
+    \item \href{https://arxiv.org/abs/2410.02724}{Large Language Models as Markov Chains}
+    \item \href{https://arxiv.org/abs/2406.06486}{Continuum Attention for Neural Operators}
+    \item \url{https://tiktokenizer.vercel.app/}
+\end{itemize}
+Notes:
+\begin{itemize}
+    \item We clarified how a transformer architecture works both in discrete space and continuous space. For discrete case transformers are useful to sample next token (think of a word) from a probability measure.
+    For continuous time, a token is a discretization in the space direction of a solution function of a PDE at time t, and transformers are useful to sample the solution function at t+1.
+    \item The paper Continuum Attention for Neural Operators is concerned with exploring what happens as the discretization in the space direction becomes finer and finer and approximates the solution function.
+    \item The project is concerned with drawing a parallel between continuous time attention and a stochastic process (e.g Brownian motion); similar to what was done for discrete time and Markov Chains.
+\end{itemize}
+
+\section{13/02/2026 Meeting 3}
+Material discussed:
+\begin{itemize}
+    \item \href{https://arxiv.org/abs/2406.06486}{Continuum Attention for Neural Operators}
+\end{itemize}
+Notes:
+\begin{itemize}
+    \item Discussed explicit form of a solution operator for the Laplace equation (Integral of Green's function)
+    \item Self-attention can be viewed as a mapping between the sequence $\{u_i\}_{i=1}^N$ into a sequence \newline $\{\texttt{attention}(u,v)_i \}_{i=1}^N$. Two ways of generalizing this.
+    \begin{enumerate}
+        \item Replace $i \in \{1,\ldots,n\}$ with $x \in \Omega$, where $\Omega \subset \mathbb R^n$ is a bounded open subset of $\mathbb R^n$. We would obtain $\{u(x)\}_{x \in D}$. This is then discretized to obtain $\{u(x_i) \}_{i=1}^N$.
+        \item Retain discrete index $i$ but allow sequence to take values in Banach spaces of $\mathbb R$-valued functions defined over $\Omega \subset \mathbb R^n$, a bounded open subset of $\mathbb R^n$. That is, a Banach space of functions $u:\Omega \to \mathbb R$.
+        For example consider $u \in L^2(\Omega)$. Then consider the truncation of the span of $L^2(\Omega)$: $\operatorname{span}(L^2(\Omega))\approx\{\psi_1,\ldots,\psi_n\}$.
+        Then $u\approx \sum_{i=1}^N c_i \psi_i$ where $c_i = \langle u, \psi_i \rangle$. Then our sequence may be represented by $\{c_i\psi_i\}_{i=1}^N$.
+    \end{enumerate}
+    \item Discussed equivalence between Definition 2, $\mathrm{A}^N(u)(j):=\mathbb{E}_{k \sim p(k ; u, j)}[V u(k)]$ and the classical definition $\mathrm{A}^N(u)=\text { attention }(u, u):=\operatorname{softmax}\left(u Q^T K u^T\right) u V^T$.
+    \item Discussed statement of Theorem 6. Understand proof for next time.
+\end{itemize}
+
+\section{20/02/2026 Meeting 4}
+Material discussed:
+\begin{itemize}
+    \item \href{https://arxiv.org/abs/2406.06486}{Continuum Attention for Neural Operators}
+\end{itemize}
+Notes:
+\begin{itemize}
+    \item Worked through the proof of Theorem 6.
+    \item Trying to refine the scope of the project. We should shift the focus on understanding the relationship between transformers and Markov chains first, and then use ideas from Continuum Attention paper.
+\end{itemize}
+
+\section{27/03/2026 Meeting 5}
+Material discussed:
+\begin{itemize}
+    \item \href{https://arxiv.org/abs/2410.02724}{Large Language Models as Markov Chains}
+\end{itemize}
+Notes:
+\begin{itemize}
+    \item We want to generalize the framework in Section 3 as follows:
+    \begin{itemize}
+        \item State space $H$ would be the set of all $L^2(\mathbb R^d)$ sequences, and we would consider $L^2(\mathbb R^d) = \operatorname{span}(e_1,e_2,\ldots)$.
+        \item The model input would be $(g_1,\ldots,g_k) \in H$.
+        \item The output would be $f_\Theta(g_1,\ldots,g_k) = g_{k+1}$
+        \item The framework would be one of these: (\href{https://en.wikipedia.org/wiki/Markov_chains_on_a_measurable_state_space}{see this})
+        
+\begin{tabularx}{\textwidth}{|c|X|X|}
+\hline
+ & Countable state space & Continuous or general state space \\
+\hline
+Discrete-time 
+& Discrete-time Markov chain on a countable or finite state space 
+& Markov chain on a measurable state space (for example, Harris chain) \\
+\hline
+Continuous-time 
+& Continuous-time Markov process or Markov jump process 
+& Any continuous stochastic process with the Markov property (for example, the Wiener process) \\
+\hline
+\end{tabularx}
+    \end{itemize}
+    \item We may write $\displaystyle g_i(x) = \lim_{n \to \infty}\begin{bmatrix}
+            a_{1i} \\ \vdots \\ a_{ni}  \end{bmatrix}\begin{bmatrix}
+            e_{1} \\ \vdots \\ e_{n}  \end{bmatrix}$.
+    \item Then define the operator $A: L^2 \to \ell^2$ given by $g_i \mapsto \begin{bmatrix}
+            a_{1i} \\ \vdots \\ a_{ni}  \end{bmatrix}$. The inverse would be $\begin{bmatrix}  a_{1i} \\ \vdots \\ a_{ni}  \end{bmatrix} \mapsto \sum_j a_{ji}e_j$.
+    \item Claim: $g \in L^2 \implies (a_i)_i \in \ell^2$. Proof: by Parseval, $\langle \sum a_ie_i, \sum a_j e_j \rangle < \infty$. Hence, $\sum a_i^2 < \infty$.
+    \item If a Markov chain is characterized by a transition matrix, what would be the equivalent for our state space?
+    \item How would sampling the next function work? (see page 6)
+\end{itemize}
+
+
+\section{10/04/2026 Meeting 6}
+Material discussed:
+\begin{itemize}
+    \item \href{https://arxiv.org/abs/2410.02724}{Large Language Models as Markov Chains}
+    \item \href{https://www.cambridge.org/core/books/markov-chains-and-stochastic-stability/E2B82BFB409CD2F7D67AFC5390C565EC}{Markov chains and stochastic stability}
+\end{itemize}
+Notes:
+\begin{itemize}
+   \item Narrowed down the framework to discrete-time general state space Markov chains.
+   \item Found a reference (second link) for this object, we have to study definitions of Markov chain and Markov kernels.
+   \item Observation: the proof in the LLM paper is not a usual "start from an algebraic statement get to a algebraic result". Rather, it is a "fit definition to object" (like showing Laplace equation is elliptic).
+    \item How would sampling the next function work? (see page 6 from first link).
+\end{itemize}
+
+\section{17/04/2026 Meeting 7}
+Material discussed:
+\begin{itemize}
+    \item \href{https://arxiv.org/abs/2410.02724}{Large Language Models as Markov Chains}
+    \item \href{https://www.cambridge.org/core/books/markov-chains-and-stochastic-stability/E2B82BFB409CD2F7D67AFC5390C565EC}{Markov chains and stochastic stability}
+    \item \href{https://arxiv.org/abs/2406.06486}{Continuum Attention for Neural Operators}
+\end{itemize}
+Notes:
+\begin{itemize}
+    \item The attention operator $A^N$ is a mapping from a sequence $u: \{1,\ldots, N\} \to \mathbb R^d$ to a sequence $Au:\{1,\ldots, N\} \to \mathbb R^d$
+    \item The continuum attention operator $A$ is a mapping from a function $u: \mathbb R^d\to \mathbb R^d$ to a function $Au: \mathbb R^d\to \mathbb R^d$.
+\end{itemize}
+We have the following summary.
+\begin{itemize}
+    \item Current:    
+    \begin{itemize}
+        \item $X = \{X_t\}_{t \in \mathbb N} :\mathbb N_0 \to \mathcal V^*_N$ is the Markov chain. \newline
+        State space: $V^*_N$ is the set of all sequences consisting of at most $N$ elements of $\mathcal V$, the vocabulary. Both $\mathcal V$ and $\mathcal V^*_N$ are of finite cardinality.
+        \item $X_i = u_i = (a_i,\ldots,a_{i+N-1})$.
+        \item $u_i:\{1,\ldots,N\}\to \mathcal V$ is a sequence of tokens / sentence.
+        \item $a_i \in \mathcal V$ is a token / word.
+    \end{itemize}
+    \item Generalization 1:    
+    \begin{itemize}
+        \item $X = \{X_t\}_{t \in \mathbb N} :\mathbb N_0 \to \mathbb (R^d)^N$ is the Markov chain. \newline
+        State space: $(R^d)^N$ is the set of all sequences consisting of at most $N$ points of $\mathbb R^d$. $(R^d)^N$ is uncountable and finite-dimensional.
+        \item $X_i = u_i = (a_i,\ldots,a_{i+N-1})$.
+        \item $u_i:\{1,\ldots,N\}\to \mathbb R^d$ is a sequence of points / time series.
+        \item $a_i \in \mathbb R^d$ is a point.
+    \end{itemize}
+    \item Generalization 2:
+    \begin{itemize}
+        \item $X = \{X_t\}_{t \in \mathbb N} :\mathbb N_0 \to \mathbb (L^2(\mathbb R^d))^N$ is the Markov chain. \newline
+        State space: $(L^2(\mathbb R^d))^N$ is the set of all sequences consisting of at most $N$ functions of $L^2(\mathbb R^d)$. $(L^2(\mathbb R^d))^N$ is uncountable and infinite-dimensional.
+        \item $X_i = u_i = (f_i,\ldots,f_{i+N-1})$.
+        \item $u_i:\{1,\ldots,N\}\to L^2(\mathbb R^d)$ is a sequence of functions / solutions.
+        \item $f_i \in L^2(\mathbb R^d)$ is a function.
+    \end{itemize}
+\end{itemize}
+Idea:
+\begin{itemize}
+    \item For generalization 1: apply Markov chain on general state space theory to the transformer with discrete attention (probability formulation). Maybe consider continuum attention.
+    \item For generalization 2: apply Markov chain on general state space theory to the transformer with continuum attention (transformer neural operators).
+    \item The strategy is to first study Markov chain in general state space and find right attention/transformer architecture for generalization 1.
+    \item Secondly, study the transformer neural operators.
+    \item We also want to check what the inputs and outputs of LLMs/discrete transformers and TNOs/continuous transformers.
+\end{itemize}
+
+\section{05/06/2026 Meeting 8}
+Material discussed:
+\begin{itemize}
+    \item \href{https://arxiv.org/abs/2410.02724}{Large Language Models as Markov Chains}
+    \item \href{https://www.cambridge.org/core/books/markov-chains-and-stochastic-stability/E2B82BFB409CD2F7D67AFC5390C565EC}{Markov chains and stochastic stability}
+    \item \href{https://arxiv.org/abs/2406.06486}{Continuum Attention for Neural Operators}
+\end{itemize}
+Notes:
+\begin{itemize}
+   \item First meeting after exam season break. General recap of scope.
+   \item Generalization 2 is concerned with sequences of functions. However the generalization in ‘Continuum Attention for Neural Operators’ is a map from functions to functions, NOT sequences of functions to sequences of functions.
+\end{itemize}
+We have the following (updated) summary.
+\begin{itemize}
+    \item Current (Attention used in LLMs)
+    \begin{itemize}
+        \item Discrete time $\mathbb N_0$.
+        \item Discrete state space $\mathcal V^*_N$, the set of sequences consisting of at most $N$ elements of $\mathcal{V}$, the vocabulary.
+        \item An element of $\mathcal V^*_N$ looks like $(a_0,\ldots,a_{N-1})$, where each $a_i \in \mathcal V$ is a token / word.
+    \end{itemize}
+    \item Generalization 1 (Discrete attention used in `Continuum Attention for Neural Operators')
+    \begin{itemize}
+        \item Discrete time $\mathbb N_0$.
+        \item General state space $\mathbb R^d_N$, the set of sequences consisting of $N$ elements of $\mathbb R^d$.
+        \item An element of $\mathbb R^d_N$ looks like $(a_0,\ldots,a_{N-1})$, where each $a_i \in \mathbb R^d$.
+    \end{itemize}
+    \item Generalization 2 (Continuum attention used in `Continuum Attention for Neural Operators'):
+    \begin{itemize}
+        \item Discrete time $\mathbb N_0$.
+        \item General state space $L^2([0,1])$, the set of square integrable functions.
+        \item Note: $ L^2([0,1])$ is isomorphic to $\ell_2(\mathbb N)$ via Fourier/orthonormal basis.
+    \end{itemize}
+\end{itemize}
+
+\section{12/06/2026 Meeting 9}
+Material discussed:
+\begin{itemize}
+    \item \href{https://arxiv.org/abs/2410.02724}{Large Language Models as Markov Chains}
+    
+\end{itemize}
+Notes:
+\begin{itemize}
+    \item Transformers are just a map, then used in LLM to induce an auto-regressive process, with sampling. Similarly, TNOs are just operators, but it is not clear how stochasticity is used. For example, for operator learning, they are just a deterministic process.
+    \item The key observation is that we are not investigating an existing architecture. Instead we can create our own one.
+    \item We want an operator that takes in a sequence of functions, and then outputs a probability measure over a suitable function space. Sampling, deletion, and replacement then yields another sequence of functions.
+    \item In this setting, there would indeed be a Markov formulation as discussed previously.
+\end{itemize}
+Questions:
+\begin{itemize}
+    \item Understand the proposed architecture by reading p5-7 of LLM paper.
+    \item In particular, understand how does sampling work / what is a probability over $L^2$.
+    \item Figure out the main result for Markov chains in general state space (do the main theorems require countability?).
+    \item Figure out the right formulation for the Markov chain (draw a comparison between the stochastic kernel and the transition matrix).
+\end{itemize}
+
+\section{19/06/2026 Meeting 10}
+Material discussed:
+\begin{itemize}
+    \item \href{https://arxiv.org/abs/2410.02724}{Large Language Models as Markov Chains}
+    \item \href{https://www.cambridge.org/core/books/markov-chains-and-stochastic-stability/E2B82BFB409CD2F7D67AFC5390C565EC}{Markov chains and stochastic stability}
+\end{itemize}
+Operator proposal:
+\begin{enumerate}
+    \item Input is a sequence of functions $f=(f_0,\ldots,f_{n-1})$.
+    \item Let $G:\Omega \to L^2(D)$ be a random variable (with realization $g$) such that its law, $\mu_g$, is a probability measure over $L^2$. This measure is likely to be taken Gaussian.
+    \item The output is going to be $T(f,g) = (f_1,\ldots,f_{n-1},g)$.
+\end{enumerate}
+Formulation proposal:
+\begin{itemize}
+    \item State space: $X = (L^2(D))^n$, the space of sequences of function in $L^2(D)$ of length $N$.
+    \item Discrete time: $\mathbb N_0$.
+    \item Let $\tilde \mu = \delta_{f_1} \otimes \ldots \otimes \delta_{f_{n-1}} \otimes \mu_g$. The Markov kernel is given by
+    \begin{equation*}
+        P(f,A) = \int_X 1_A(T(f,g)\; \tilde \mu (dg).
+    \end{equation*}
+    \item Note that $P(f,A) = 0$ if $A \notin \{f_1\} \times \ldots \times \{f_{n-1}\} \times L^2(D)$.
+\end{itemize}
+Notes:
+\begin{itemize}
+    \item If $\mu_g$ is Gaussian, then $G$ is given by Karhunen–Loève theorem by
+    \begin{equation*}
+        G(x) = m(x) +\sum_{k=1}^\infty \lambda_k \xi_k \phi_k(x),
+    \end{equation*}
+    where $m(x)$ is the mean, $\xi_k \sim \mathcal N(0,1)$ iid, $\phi_k(x)$ are basis vectors, and $\lambda_k$ are scalars that control regularity / they are eigenvalues.
+\end{itemize}
+Todo:
+\begin{itemize}
+    \item Check what does it mean for a $L^2$-valued random variable to have a law.
+    \item Check what does it mean for a $L^2$-valued random variable to have a Gaussian law.
+    \item Check generalized Gaussian fields (equivalent of Gaussian processes but for functions spaces). Try to find equivalent of mean and covariance kernels etc.
+    \item Check Karhunen–Loève theorem and Mercer theorem for the representation.
+    \item Try to understand Markov chains in general state space (draw a comparison between transition matrices and stochastic kernel).
+    \item Check that the Markov kernel is correct, check also the product measure makes sense.
+    \item Try to simplify the expression (should become, by Fubini, an integral over $L^2$).
+\end{itemize}
+
+\section{03/07/2026 Meeting 11}
+Material discussed:
+\begin{itemize}
+    \item \href{https://arxiv.org/abs/2410.02724}{Large Language Models as Markov Chains}
+    \item \href{https://www.cambridge.org/core/books/markov-chains-and-stochastic-stability/E2B82BFB409CD2F7D67AFC5390C565EC}{Markov Chains and Stochastic Stability}
+\end{itemize}
+Operator proposal:
+\begin{enumerate}
+    \item Input is a sequence of functions $f = (f_0,\ldots,f_{n-1}) \in X$, with $X = \bigl(L^2(D)\bigr)^n$.
+    \item Let $\Phi : X \times \mathcal{B}(L^2(D)) \to [0,1]$ be a Markov kernel. Equivalently, for each current state $f \in X$, let $G_f : \Omega \to L^2(D)$ be an $L^2(D)$-valued random variable with law $\mu_f := \Phi(f,\cdot)$, so that, conditionally on the current state $f$, one samples $g \sim \mu_f$. This measure may, for instance, be chosen Gaussian.
+    \item The output is given by $T(f,g) = (f_1,\ldots,f_{n-1},g)$.
+\end{enumerate}
+Formulation proposal:
+\begin{itemize}
+    \item State space: $X = \bigl(L^2(D)\bigr)^n$, the space of sequences of functions in $L^2(D)$ of fixed length $n$.
+    \item Discrete time: $\mathbb{N}_0$.
+    \item For each $f=(f_0,\ldots,f_{n-1}) \in X$, the transition kernel is given by
+    \begin{equation*}
+    P(f,\cdot) = \delta_{f_1} \otimes \cdots \otimes \delta_{f_{n-1}} \otimes \mu_f,
+    \end{equation*}
+    equivalently, for every measurable set $A \in \mathcal{B}(X)$
+    \begin{align*}
+        P(f,A) &= \int_X \mathbf{1}_A(y)\,P(f,dy)\\
+        &= \int_X \mathbf{1}_A(y_0,\ldots,y_{n-1})\,\delta_{f_1}(dy_0)\cdots\delta_{f_{n-1}}(dy_{n-2})\,\mu_f(dy_{n-1})\\
+        &= \int_{L^2(D)} \mathbf{1}_A\bigl(T(f,g)\bigr)\,\mu_f(dg).
+    \end{align*}
+    \item Note that if $S_f := \{f_1\} \times \cdots \times \{f_{n-1}\} \times L^2(D)$, then $P(f,S_f)=1$. In particular, if $A \cap S_f = \varnothing$, then $P(f,A)=0$.
+\end{itemize}
+Notes:
+\begin{itemize}
+    \item If $\mu_f$ is Gaussian, then under the usual assumptions, $G_f$ admits a Karhunen--Lo\`eve expansion of the form
+    \begin{equation*}
+        G_f(x) = m_f(x) + \sum_{k=1}^\infty \sqrt{\lambda_k^{(f)}}\,\xi_k\,\phi_k^{(f)}(x),
+    \end{equation*}
+    where $m_f(x)$ is the mean, $\xi_k \sim \mathcal{N}(0,1)$ are i.i.d., $\phi_k^{(f)}(x)$ are eigenfunctions of the covariance operator, and $\lambda_k^{(f)}$ are the corresponding eigenvalues.
+\end{itemize}
+More notes:
+\begin{itemize}
+    \item Let $X_t = f \in X = (L^2(D))^n$ denote the current state. Saying that the new function $G_t$ has conditional law $\Phi(f,\cdot)$ means that, for every measurable set $B \subseteq L^2(D)$,
+    \[
+    \mathbb{P}(G_t \in B \mid X_t = f) = \Phi(f,B).
+    \]
+    Equivalently, conditioned on the current state $f$, the random function $G_t$ is distributed according to the probability measure $\Phi(f,\cdot)$ on $L^2(D)$.
+
+    \item The update map is given by $T(f,g) = (f_1,\dots,f_{n-1},g)$, so the transition kernel on $X$ is
+    \[
+    P(f,A) = \int_{L^2(D)} \mathbf{1}_A(T(f,g))\,\Phi(f,dg),
+    \qquad A \in \mathcal{B}(X).
+    \]
+
+    \item In the Gaussian case, one assumes that
+    \[
+    G_t \mid X_t = f \sim \mathcal{N}(m_f, C_f),
+    \]
+    where $m_f \in L^2(D)$ is the conditional mean and $C_f$ is the conditional covariance operator. Thus the current state $f$ determines the Gaussian law from which the next function is sampled.
+
+
+\end{itemize}
+Questions:
+\begin{itemize}
+    \item How many time steps do we need to run to identify the Harris chain?
+    \item Find theorems that give information about the sequence (state).
+\end{itemize}
+
+
+\section{10/07/2026 Meeting 12}
+Material discussed:
+\begin{itemize}
+    \item \href{https://arxiv.org/abs/2410.02724}{Large Language Models as Markov Chains}
+    \item \href{https://www.cambridge.org/core/books/markov-chains-and-stochastic-stability/E2B82BFB409CD2F7D67AFC5390C565EC}{Markov Chains and Stochastic Stability}
+    \item \href{https://www.ams.org/surv/062}{Gaussian measures}
+\end{itemize}
+Notes:
+\begin{itemize}
+    \item Fully understand Markov chains.
+    \item Formalise that our Markov chain is Harris recurrent.
+    \item Explore concepts such as $\gamma$-irreducibility, drift conditions, invariant measures, Feller, tightness, Lyupanov functions.
+    \item Apply theorems and results such as Meyn-Tweedie theorem, Krylov-Bogoliubov to Gaussian measures. Find out under which assumptions they hold, specifically for the Gaussian case.
+    \item (expanding on the above) Find conditions in the Gaussian 'language' of what equivalent measures means in terms of covariance.
+    \item Once we show Harris chain theoretically, we estimate the Harris chain by increasing the number of observations. We want to find out how many observations we need. See LLMs as Markov chain paper and Hoeffding inequality specifically.
+
+\end{itemize}
+
+
+\section{17/07/2026 Meeting 13}
+Material discussed:
+\begin{itemize}
+    \item \href{https://arxiv.org/abs/2410.02724}{Large Language Models as Markov Chains}
+    \item \href{https://www.cambridge.org/core/books/markov-chains-and-stochastic-stability/E2B82BFB409CD2F7D67AFC5390C565EC}{Markov Chains and Stochastic Stability}
+    \item \href{https://www.ams.org/surv/062}{Gaussian measures}
+\end{itemize}
+Notes:
+\begin{itemize}
+    \item Work out details for all steps that are missing.
+    \begin{enumerate}
+        \item Architecture details (do last)
+        \item Markov chain formulation (done)
+        \item Markov chain is geometrically ergodic
+        \item Pretraining generalization bounds
+        \item Sample complexity.
+    \end{enumerate}
+\end{itemize}
+
+
+\section{24/07/2026 Meeting 14}
+Material discussed:
+\begin{itemize}
+    \item \href{https://arxiv.org/abs/2410.02724}{Large Language Models as Markov Chains}
+    \item \href{https://www.cambridge.org/core/books/markov-chains-and-stochastic-stability/E2B82BFB409CD2F7D67AFC5390C565EC}{Markov Chains and Stochastic Stability}
+    \item \href{https://www.ams.org/surv/062}{Gaussian measures}
+\end{itemize}
+Notes:
+\begin{itemize}
+    \item Gave proof that the Gaussian measure is indeed a measure and it is measurable.
+    \item Gave proof that the the Markov kernel is indeed a Markov kernel.
+\end{itemize}
+
+\end{document}

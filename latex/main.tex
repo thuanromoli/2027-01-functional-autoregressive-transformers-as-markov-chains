@@ -1,0 +1,290 @@
+\documentclass[a4paper,10pt,reqno]{amsart}
+
+%------------------------------------------------
+% Basic formatting
+%------------------------------------------------
+\usepackage[english]{babel}
+\usepackage[
+    a4paper,
+    left=2.5cm,
+    right=2.5cm,
+    top=2.5cm,
+    bottom=3cm]{geometry}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+\usepackage{csquotes}
+\usepackage{enumitem}
+
+%------------------------------------------------
+% Section formatting
+%------------------------------------------------
+\usepackage{titlesec}
+
+\titleformat{\section}
+    {\normalfont\Large\bfseries}
+    {\thesection.}
+    {0.5em}
+    {}
+\titlespacing*{\section}
+    {0pt}    % left indentation
+    {1.5em}    % space before section
+    {0pt}  % space after section
+
+\titleformat{\subsection}
+    {\normalfont\large\bfseries}
+    {\bfseries\thesubsection.}
+    {0.5em}
+    {}
+\titlespacing*{\subsection}
+    {0pt}    % left indentation
+    {0.5em}    % space before
+    {-0.5em}  % space after
+
+\titleformat{\paragraph}[runin]
+    {\normalfont\normalsize\bfseries}
+    {}
+    {0pt}
+    {}
+
+\titlespacing*{\paragraph}
+    {0pt}
+    {0.5em}
+    {1em}
+
+%------------------------------------------------
+% Mathematics
+%------------------------------------------------
+\usepackage{amsmath,amssymb,amsfonts,amsthm}
+\usepackage{mathtools}
+\allowdisplaybreaks
+\usepackage{mathrsfs}
+\usepackage{bm}
+
+%------------------------------------------------
+% Theorem environments
+%------------------------------------------------
+
+% Arguments:
+% 1. Space above
+% 2. Space below
+
+\newtheoremstyle{myplain}
+  {1em}        % Space above
+  {0em}       % Space below
+  {\itshape}     % Body font
+  {}             % Indent
+  {\bfseries}    % Head font
+  {.}            % Punctuation
+  {0.5em}        % Space after head
+  {}             % Head spec
+
+\newtheoremstyle{mydefinition}
+  {1em}
+  {0em}
+  {\normalfont}
+  {}
+  {\bfseries}
+  {.}
+  {0.5em}
+  {}
+
+\newtheoremstyle{myremark}
+  {1em}
+  {0em}
+  {\normalfont}
+  {}
+  {\itshape}
+  {.}
+  {0.5em}
+  {}
+
+% Theorems, lemmas, propositions, corollaries
+\theoremstyle{myplain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+
+% Definitions, assumptions, examples
+\theoremstyle{mydefinition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{assumption}[theorem]{Assumption}
+\newtheorem{example}[theorem]{Example}
+
+% Remarks
+\theoremstyle{myremark}
+\newtheorem{remark}[theorem]{Remark}
+
+% Compact proof spacing
+\makeatletter
+\renewenvironment{proof}[1][\proofname]{%
+  \par
+  \pushQED{\qed}%
+  \normalfont
+  \topsep=0em
+  \trivlist
+  \item[\hskip\labelsep\itshape #1\@addpunct{.}]%
+  \ignorespaces
+}{%
+  \popQED
+  \endtrivlist
+  \@endpefalse
+}
+\makeatother
+
+%------------------------------------------------
+% Graphics
+%------------------------------------------------
+\usepackage{graphicx}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+
+%------------------------------------------------
+% Page numbering
+%------------------------------------------------
+\pagestyle{fancy}
+\fancyhf{} % clear all header and footer fields
+
+\fancyfoot[C]{\thepage} % centred page number at bottom
+\setlength{\footskip}{1cm}
+
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+%------------------------------------------------
+% Hyperlinks
+%------------------------------------------------
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=black,
+    urlcolor=black
+}
+
+%------------------------------------------------
+% Bibliography
+%------------------------------------------------
+\usepackage[
+    backend=biber,
+    style=alphabetic
+]{biblatex}
+\addbibresource{references.bib}
+
+%------------------------------------------------
+% Paragraph formatting
+%------------------------------------------------
+\linespread{1.2}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{1em}
+
+%------------------------------------------------
+% Title page dimensions
+%------------------------------------------------
+\newlength{\logowidth}
+\setlength{\logowidth}{70mm}
+
+\newlength{\logopad}
+\setlength{\logopad}{17.5mm}
+
+\begin{document}
+
+%------------------------------------------------
+% Title page
+%------------------------------------------------
+\begin{titlepage}
+    \pgfdeclareimage[width=\logowidth]{logo}{logo}
+    \pgftext[at=\pgfpoint{-1.75cm+\logopad}{3cm-\logopad},
+             top,left]
+             {\pgfuseimage{logo}}
+
+    \begin{center}
+        \vspace*{\fill}
+
+        {\large \scshape{MSc APPLIED MATHEMATICS RESEARCH PROJECT}}\\[0.8cm]
+
+        \rule{\linewidth}{0.5mm}\\[0.4cm]
+
+        {\LARGE\bfseries
+        Functional Autoregressive Transformers as Markov Chains\par}
+
+        \rule{\linewidth}{0.5mm}
+
+        \vskip 2.5cm
+
+        Author\\[3mm]
+        {\large\bfseries Van Thuan Romoli}\\[1mm]
+        {\normalsize CID: 06047418}
+
+        \vskip 1.5cm
+
+        Supervised by\\[3mm]
+        {\large\bfseries Dr Nicolas Boullé}
+
+        \vspace*{\fill}
+
+        {\small\textit{The work contained in this thesis is my own work unless otherwise stated}}\\[-0.5mm]
+        {\small
+        Department of Mathematics
+        $\cdot$
+        Imperial College London
+        $\cdot$
+        2026}
+    \end{center}
+\end{titlepage}
+
+%------------------------------------------------
+% Table of contents formatting
+%------------------------------------------------
+\makeatletter
+\def\l@section{\@tocline{1}{-2pt}{1pc}{1.5pc}{\bfseries}}
+\def\l@subsection{\@tocline{2}{-4pt}{2.5pc}{2pc}{}}
+\makeatother
+
+%------------------------------------------------
+% Enumerate formatting
+%------------------------------------------------
+\setlist[enumerate]{
+    topsep=0pt,
+    partopsep=0pt,
+    parsep=0pt
+}
+
+% Your document starts here
+
+\pagenumbering{roman}
+
+\input{abstract}
+
+\clearpage
+
+\tableofcontents
+\thispagestyle{empty}
+
+\clearpage
+
+\pagenumbering{arabic}
+
+\input{introduction}
+
+\input{preliminaries}
+
+\input{markov-chain-framework}
+
+\input{generalisation-bounds}
+
+\input{conclusion}
+
+\clearpage
+
+\printbibliography
+
+\clearpage
+
+\appendix
+
+\input{appendix}
+
+\end{document}

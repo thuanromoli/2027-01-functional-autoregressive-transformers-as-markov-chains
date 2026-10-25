@@ -1,0 +1,919 @@
+\section{General state-space Markov chain framework for functional autoregressive transformers}\label{sec:General state-space Markov chain framework for functional autoregressive transformers}
+
+In this section, we develop a general state-space Markov-chain formulation of the inference mechanism of the functional autoregressive transformer introduced in Section~\ref{subsec:Functional autoregressive transformer}. The central idea is analogous to the finite-state formulation of autoregressive language models considered by Zekri et al.~\cite{ZekriEtAl2025}: although the sequence of individual outputs is not, in general, a first-order Markov chain, the process becomes Markovian once the state is taken to be the entire context window.
+
+We first formulate the context transition kernel and establish its well-posedness. We then derive a Lyapunov drift condition and an \(n\)-step minorisation, which together yield existence, uniqueness, and uniform geometric convergence to an invariant probability measure. We conclude by discussing the interpretation and modelling implications of the result.
+
+\subsection{Markov chain formulation}\label{subsec:Markov chain formulation}
+Let \(H\) be a real separable Hilbert space, fix a context length \(n\in\mathbb N\), and define the context space \(E=H^n\). A first attempt might be to regard the generated sequence of functions \((f_t)_{t\geqslant0}\) itself as a first-order Markov chain on \(H\). This is generally incorrect because the conditional distribution of the next function depends on the full context of the previous \(n\) functions, rather than only on the most recently generated function.
+
+Indeed, if \(F_t=(f_t,\ldots,f_{t+n-1})\in E\), then the functional autoregressive transformer generates the next function according to \(f_{t+n}\mid F_t\sim Q_\Theta(F_t,\cdot)=\mathcal N(m_\Theta(F_t),C_\Theta(F_t))\). In general, this conditional law depends on all components of \(F_t\).
+As in finite-context autoregressive language models, the process becomes first-order Markov once the state is taken to be the entire context. We therefore regard \(F_t=(f_t,\ldots,f_{t+n-1})\) as the state of the process at time \(t\). For the moment, suppose that \(Q_\Theta\) is a Markov transition kernel from \(E\) to \(H\).
+
+\begin{definition}[]\label{def:FAT Markov transition kernel}
+For \(F=(f_0,\ldots,f_{n-1})\in E\) and \(A\in\mathcal B(E)\), define the \emph{functional autoregressive transformer transition kernel} by
+\[P_\Theta(F,A)=\int_H\mathbf 1_A(f_1,\ldots,f_{n-1},g)\,Q_\Theta(F,\mathrm dg).\]
+When \(n=1\), this is interpreted as \(P_\Theta(f_0,A)=Q_\Theta(f_0,A)\).
+\end{definition}
+
+For a fixed context \(F\), the measure \(P_\Theta(F,\cdot)\) is the law of the next context: the first \(n-1\) coordinates are obtained by deterministically shifting the current context, while the final coordinate is sampled from \(Q_\Theta(F,\cdot)\).
+
+\begin{proposition}[Markov transition kernel]\label{prop:Markov transition kernel}
+Suppose that \(Q_\Theta\) is a Markov transition kernel from \(E\) to \(H\). Then \(P_\Theta\) is a Markov transition kernel from \(E\) to \(E\).
+\end{proposition}
+
+\begin{proof}
+We verify the two kernel properties in Definition \ref{def:Markov transition kernel} separately.
+
+\textit{Step 1: Probability measure for a fixed context.}
+Fix \(F=(f_0,\ldots,f_{n-1})\in E\) and define \(T_F:H\to E\) by
+\(
+T_F(g)=(f_1,\ldots,f_{n-1},g).
+\)
+Then \(P_\Theta(F,A)=Q_\Theta(F,T_F^{-1}(A))\). Thus \(P_\Theta(F,\cdot)\) is the pushforward of the probability measure \(Q_\Theta(F,\cdot)\) under \(T_F\), and is therefore a probability measure on \(E\).
+
+\textit{Step 2: Mesurability.}
+Define \(T:E\times H\to E\) by
+\(
+T\bigl((f_0,\ldots,f_{n-1}),g\bigr)
+=(f_1,\ldots,f_{n-1},g).
+\)
+This map is continuous. Since \(Q_\Theta\) is a Markov transition kernel, the standard kernel-integration lemma \parencite[Lemma~3.2]{Kallenberg2021} shows that
+\(
+F\longmapsto\int_H\mathbf 1_A\bigl(T(F,g)\bigr)Q_\Theta(F,\mathrm dg)
+\)
+is Borel measurable for every \(A\in\mathcal B(E)\). This is precisely \(F\mapsto P_\Theta(F,A)\).
+\end{proof}
+
+\begin{theorem}[Markov chain formulation]\label{thm:Markov chain formulation}
+Let \(\mu\in\mathcal P(E)\) be an initial distribution and suppose that \(Q_\Theta\) is a Markov transition kernel from \(E\) to \(H\). Then recursive functional autoregressive generation determines a time-homogeneous Markov chain \((F_t)_{t\in\mathbb N_0}\) on \(E=H^n\) with initial distribution \(\mu\) and transition kernel \(P_\Theta\).
+\end{theorem}
+
+\begin{proof}
+Proposition~\ref{prop:Markov transition kernel} gives a Markov transition kernel on \(E\). Theorem~\ref{thm:Existence of the Markov process} therefore gives a time-homogeneous Markov chain with this kernel and the prescribed initial law. By Definition~\ref{def:FAT Markov transition kernel}, its update is exactly
+\(
+F_t=(f_t,\ldots,f_{t+n-1})
+\longmapsto
+F_{t+1}=(f_{t+1},\ldots,f_{t+n}),
+\)
+where \(f_{t+n}\mid F_t\sim Q_\Theta(F_t,\cdot)\).
+\end{proof}
+
+The remaining well-posedness question is whether the coefficient-space Gaussian output of the architecture indeed defines a Markov transition kernel for every context.
+
+\subsection{Well-posedness of the Gaussian output kernel}
+\label{subsec:Well-posedness of Markov transition kernels}
+
+We now verify that the output layer introduced in Section~\ref{subsec:Functional autoregressive transformer} defines a well-posed conditional probability distribution for every functional context and that these distributions form a Markov transition kernel.
+
+Recall that the mean is given by \(m_\Theta(F)=\mathsf E_d\mu_\Theta(F)\), where
+\(
+\mu_\Theta(F)
+=
+\mu_0+\widetilde{\mathsf T}_m\bigl(h_\Theta(F)\bigr)
+\), and the covariance operator is given by
+\(
+C_\Theta(F)
+=
+\sigma_0^2\Pi_{S_d}
++
+\sum_{k=1}^r
+c_{k,\Theta}(F)\otimes c_{k,\Theta}(F),\)
+for 
+\(
+\sigma_0>0,
+\)
+where
+\(c_{k,\Theta}(F)=\mathsf E_d\gamma_{k,\Theta}(F)\)
+with
+\(
+\gamma_{k,\Theta}(F)
+=
+\gamma_{0,k}
++\widetilde{\mathsf T}_{C,k}\bigl(h_\Theta(F)\bigr).
+\)
+
+
+The first step is to obtain uniform bounds on the quantities predicted by the output heads. These bounds follow from the bounded latent representation \(\|h_\Theta(F)\|_{\mathcal H}\leqslant R\) for every \(F\in E\), together with the Lipschitz assumptions imposed on the coefficient heads.
+
+\begin{proposition}[Uniform bound for the mean]
+\label{prop:Uniform bound for the mean}
+Suppose that \(\widetilde{\mathsf T}_m:\mathcal H\to\mathbb R^d\) is \(L_m^{\mathrm{head}}\)-Lipschitz. Then
+\(
+\sup_{F\in E}\|m_\Theta(F)\|_H
+\leqslant
+M_m,
+\)
+where
+\(
+M_m
+=
+\|\mu_0\|_2
++
+\|\widetilde{\mathsf T}_m(0)\|_2
++
+L_m^{\mathrm{head}}R
+<\infty.
+\)
+\end{proposition}
+
+\begin{proof}
+Fix \(F\in E\). Let us compute
+\[
+\begin{aligned}
+\|m_\Theta(F)\|_H
+&=
+\|\mu_\Theta(F)\|_2\\
+&=
+\|
+\mu_0
++
+\widetilde{\mathsf T}_m
+\bigl(h_\Theta(F)\bigr)
+\|_2\\
+&\leqslant
+\|\mu_0\|_2
++
+\|
+\widetilde{\mathsf T}_m
+\bigl(h_\Theta(F)\bigr)
+\|_2\\
+&\leqslant
+\|\mu_0\|_2
++
+\|\widetilde{\mathsf T}_m(0)\|_2
++
+\|
+\widetilde{\mathsf T}_m
+\bigl(h_\Theta(F)\bigr)
+-
+\widetilde{\mathsf T}_m(0)
+\|_2
+\\
+&\leqslant
+\|\mu_0\|_2
++
+\|\widetilde{\mathsf T}_m(0)\|_2
++
+L_m^{\mathrm{head}}
+\|h_\Theta(F)\|_{\mathcal H}
+\\
+&\leqslant
+\|\mu_0\|_2
++
+\|\widetilde{\mathsf T}_m(0)\|_2
++
+L_m^{\mathrm{head}}R
+\\
+&=:
+M_m.
+\end{aligned}
+\]
+The first equality follows from the isometry of \(\mathsf E_d\), see Proposition \ref{prop:Basic identities for the approximation space}. The second equality is the definition of \(\mu_\Theta(F)\). The first inequality follows from the triangle inequality. The second inequality is obtained by adding and subtracting \(\widetilde{\mathsf T}_m(0)\) and applying the triangle inequality. The third inequality uses the \(L_m^{\mathrm{head}}\)-Lipschitz continuity of \(\widetilde{\mathsf T}_m\), while the final inequality uses the uniform latent bound \(\|h_\Theta(F)\|_{\mathcal H}\leqslant R\). Since the resulting bound is independent of \(F\), taking the supremum over \(F\in E\) proves the result.
+\end{proof}
+
+\begin{proposition}[Uniform bounds for covariance factors]
+\label{prop:Uniform bounds for covariance factors}
+Suppose that, for each \(k\in\{1,\ldots,r\}\), the map \(\widetilde{\mathsf T}_{C,k}:\mathcal H\to\mathbb R^d\) is \(L_{C,k}^{\mathrm{head}}\)-Lipschitz. Then
+\(
+\sup_{F\in E}
+\|c_{k,\Theta}(F)\|_H
+\leqslant
+M_{C,k},
+\)
+where
+\(
+M_{C,k}
+=
+\|\gamma_{0,k}\|_2
++
+\|\widetilde{\mathsf T}_{C,k}(0)\|_2
++
+L_{C,k}^{\mathrm{head}}R
+<\infty.
+\)
+\end{proposition}
+
+\begin{proof}
+Fix \(F\in E\) and \(k\in\{1,\ldots,r\}\). Let us compute
+\[
+\begin{aligned}
+\|c_{k,\Theta}(F)\|_H
+&=
+\|\gamma_{k,\Theta}(F)\|_2\\
+&=
+\|
+\gamma_{0,k}
++
+\widetilde{\mathsf T}_{C,k}
+\bigl(h_\Theta(F)\bigr)
+\|_2\\
+&\leqslant
+\|\gamma_{0,k}\|_2
++
+\|
+\widetilde{\mathsf T}_{C,k}
+\bigl(h_\Theta(F)\bigr)
+\|_2\\
+&\leqslant
+\|\gamma_{0,k}\|_2
++
+\|\widetilde{\mathsf T}_{C,k}(0)\|_2
++
+\|
+\widetilde{\mathsf T}_{C,k}
+\bigl(h_\Theta(F)\bigr)
+-
+\widetilde{\mathsf T}_{C,k}(0)
+\|_2
+\\
+&\leqslant
+\|\gamma_{0,k}\|_2
++
+\|\widetilde{\mathsf T}_{C,k}(0)\|_2
++
+L_{C,k}^{\mathrm{head}}
+\|h_\Theta(F)\|_{\mathcal H}
+\\
+&\leqslant
+\|\gamma_{0,k}\|_2
++
+\|\widetilde{\mathsf T}_{C,k}(0)\|_2
++
+L_{C,k}^{\mathrm{head}}R
+\\
+&=:
+M_{C,k}.
+\end{aligned}
+\]
+The first equality follows from the isometry of \(\mathsf E_d\), see Proposition \ref{prop:Basic identities for the approximation space}. The second equality is the definition of \(\gamma_{k,\Theta}(F)\). The first inequality follows from the triangle inequality. The second inequality is obtained by adding and subtracting \(\widetilde{\mathsf T}_{C,k}(0)\) and applying the triangle inequality. The third inequality uses the \(L_{C,k}^{\mathrm{head}}\)-Lipschitz continuity of \(\widetilde{\mathsf T}_{C,k}\), while the final inequality uses the uniform latent bound \(\|h_\Theta(F)\|_{\mathcal H}\leqslant R\). Since the resulting bound is independent of \(F\), taking the supremum over \(F\in E\) proves the result.
+\end{proof}
+
+We can now verify that the covariance produced by the architecture is an admissible covariance operator and is uniformly nondegenerate on the approximation space.
+
+\begin{proposition}[Admissibility, spectral bounds, and coefficient representation]
+\label{prop:Admissibility of the covariance operator}
+Let \(\underline\lambda=\sigma_0^2\) and let
+\(
+\overline\lambda
+=
+\sigma_0^2
++
+\sum_{k=1}^rM_{C,k}^2.
+\)
+For every \(F\in E\), the following statements hold.
+\begin{enumerate}
+    \item \(m_\Theta(F)\in S_d\) and \(C_\Theta(F)\in\mathcal L_1^+(H)\).
+
+    \item The range of \(C_\Theta(F)\) is \(S_d\), and its restriction to \(S_d\) satisfies
+    \(
+    \underline\lambda I_{S_d}
+    \preceq
+    C_\Theta(F)|_{S_d}
+    \preceq
+    \overline\lambda I_{S_d}.
+    \)
+
+    \item If
+    \(
+    G_\Theta(F)
+    =
+    [
+    \gamma_{1,\Theta}(F)
+    ,
+    \ldots
+    ,
+    \gamma_{r,\Theta}(F)
+    ]
+    \in\mathbb R^{d\times r}
+    \)
+    and \(\Sigma_\Theta(F)=\sigma_0^2I_d+G_\Theta(F)G_\Theta(F)^\top\), then we have
+    \(
+    C_\Theta(F)
+    =
+    \mathsf E_d
+    \Sigma_\Theta(F)
+    \mathsf E_d^*.
+    \)
+
+    \item The trace is
+    \(
+    \operatorname{tr}\bigl(C_\Theta(F)\bigr)
+    =
+    d\sigma_0^2
+    +
+    \sum_{k=1}^r
+    \|c_{k,\Theta}(F)\|_H^2.
+    \)
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+Fix \(F\in E\).
+
+\textit{Step 1: Admissibility.}
+By construction, \(m_\Theta(F)=\mathsf E_d\mu_\Theta(F)\in S_d\). Proposition~\ref{prop:Basic identities for the approximation space} gives \(\Pi_{S_d}=\mathsf E_d\mathsf E_d^*\), so \(\Pi_{S_d}\) is the orthogonal projection onto \(S_d\). It is therefore finite rank, self-adjoint, and non-negative. For every \(k\), by Proposition \ref{prop:Finite-rank covariance}, the rank-one operator \(c_{k,\Theta}(F)\otimes c_{k,\Theta}(F)\) has the same properties. Hence \(C_\Theta(F)\) is self-adjoint, non-negative, and finite rank, and therefore belongs to \(\mathcal L_1^+(H)\).
+
+\textit{Step 2: Spectral bounds.}
+Let \(u\in S_d\). Since \(\Pi_{S_d}u=u\),
+\(
+\langle C_\Theta(F)u,u\rangle_H
+=
+\sigma_0^2\|u\|_H^2
++
+\sum_{k=1}^r
+|\langle u,c_{k,\Theta}(F)\rangle_H|^2.
+\)
+Dropping the non-negative sum gives \(\langle C_\Theta(F)u,u\rangle_H\geqslant\underline\lambda\|u\|_H^2\), which proves the lower spectral bound.
+
+For the upper bound, Cauchy--Schwarz gives
+\(
+|\langle u,c_{k,\Theta}(F)\rangle_H|^2
+\leqslant
+\|u\|_H^2
+\|c_{k,\Theta}(F)\|_H^2.
+\)
+Using Proposition~\ref{prop:Uniform bounds for covariance factors},
+\(
+\langle C_\Theta(F)u,u\rangle_H
+\leqslant
+\left(
+\sigma_0^2
++
+\sum_{k=1}^rM_{C,k}^2
+\right)
+\|u\|_H^2
+=
+\overline\lambda\|u\|_H^2.
+\)
+This proves the upper spectral bound.
+
+Every term in \(C_\Theta(F)\) has range contained in \(S_d\), so \(\operatorname{Ran}(C_\Theta(F))\subseteq S_d\). The lower spectral bound above shows that \(C_\Theta(F)|_{S_d}\) is invertible, and hence \(\operatorname{Ran}(C_\Theta(F))=S_d\).
+
+\textit{Step 3: Coefficient representation.}
+Since \(\mathsf E_d\mathsf E_d^*=\Pi_{S_d}\), we have \(\sigma_0^2\mathsf E_dI_d\mathsf E_d^*=\sigma_0^2\Pi_{S_d}\). Moreover, the columns of \(\mathsf E_dG_\Theta(F)\) are \(c_{1,\Theta}(F),\ldots,c_{r,\Theta}(F)\). Therefore,
+\(
+\mathsf E_d
+G_\Theta(F)G_\Theta(F)^\top
+\mathsf E_d^*
+=
+\sum_{k=1}^r
+c_{k,\Theta}(F)
+\otimes
+c_{k,\Theta}(F).
+\)
+Combining the two identities gives \(C_\Theta(F)=\mathsf E_d\Sigma_\Theta(F)\mathsf E_d^*\).
+
+\textit{Step 4: Trace formula.}
+Since \(\operatorname{tr}(\Pi_{S_d})=d\) and \(\operatorname{tr}(c\otimes c)=\|c\|_H^2\), linearity of the trace gives the result.
+\end{proof}
+
+The preceding proposition establishes the operator-theoretic properties required of the covariance. We now use them to identify the conditional Gaussian law and its support.
+
+\begin{theorem}[Existence, uniqueness, and support of the Gaussian output measure]
+\label{thm:Existence and uniqueness of the Gaussian output measure}
+For every \(F\in E\), there exists a unique Borel Gaussian probability measure on \(H\) with mean \(m_\Theta(F)\) and covariance operator \(C_\Theta(F)\). We denote this measure by
+\(
+Q_\Theta(F,\cdot)
+=
+\mathcal N
+\bigl(
+m_\Theta(F),
+C_\Theta(F)
+\bigr).
+\)
+Moreover, \(\operatorname{supp}Q_\Theta(F,\cdot)=S_d\) for every \(F\in E\), where the support is taken with respect to the topology inherited from \(H\).
+\end{theorem}
+
+\begin{proof}
+Fix \(F\in E\). We evaluate each statement in turn.
+
+\textit{Step 1: Existence and uniqueness.}
+Proposition~\ref{prop:Admissibility of the covariance operator} gives \(m_\Theta(F)\in H\) and \(C_\Theta(F)\in\mathcal L_1^+(H)\). Theorem~\ref{thm:Existence and uniqueness of Gaussian random elements} therefore gives a unique Borel Gaussian probability measure \(Q_\Theta(F,\cdot)=\mathcal N(m_\Theta(F),C_\Theta(F))\).
+
+\textit{Step 2: Coefficient-space representation.}
+Recall that \(\Sigma_\Theta(F)=\sigma_0^2I_d+G_\Theta(F)G_\Theta(F)^\top\). For every \(a\in\mathbb R^d\),
+\(
+a^\top\Sigma_\Theta(F)a
+=
+\sigma_0^2\|a\|_2^2
++
+\|G_\Theta(F)^\top a\|_2^2
+\geqslant
+\sigma_0^2\|a\|_2^2
+\) and since \(\sigma_0>0\), \(\Sigma_\Theta(F)\) is positive definite.
+
+Let \(Z_F\sim\mathcal N(\mu_\Theta(F),\Sigma_\Theta(F))\) in \(\mathbb R^d\) and define \(Y_F=\mathsf E_dZ_F\). Then \(\mathbb E[Y_F]=\mathsf E_d\mu_\Theta(F)=m_\Theta(F)\), while Proposition~\ref{prop:Admissibility of the covariance operator} gives
+\(
+\mathsf E_d
+\Sigma_\Theta(F)
+\mathsf E_d^*
+=
+C_\Theta(F).
+\)
+By uniqueness of Gaussian measures with prescribed mean and covariance,
+\(
+Q_\Theta(F,\cdot)
+=
+(\mathsf E_d)_\#
+\mathcal N
+\bigl(
+\mu_\Theta(F),
+\Sigma_\Theta(F)
+\bigr).
+\)
+
+\textit{Step 3: Common support.}
+Since \(\Sigma_\Theta(F)\) is positive definite, \(Z_F\) has support equal to all of \(\mathbb R^d\). The synthesis operator \(\mathsf E_d:\mathbb R^d\to S_d\) is an isometric isomorphism. Its pushforward therefore has support \(S_d\), and hence
+\(
+\operatorname{supp}
+Q_\Theta(F,\cdot)
+=
+S_d
+\)
+for every \(F\in E\).
+\end{proof}
+
+The theorem explains why the mean and covariance are parameterised in the same fixed approximation space. All conditional output measures have the same support \(S_d\), which permits the construction of a context-independent minorising measure later in the ergodicity analysis.
+
+To obtain a probability kernel, it remains to verify that the Gaussian output measure depends measurably on the context. We first establish continuity of the model parameter maps, but first a technical lemma.
+
+\begin{lemma}[Trace norm of rank-one operators]
+\label{lem:rank-one operations}
+For \(u,v\in H\), (i)
+\(
+\|u\otimes v\|_1
+=
+\|u\|_H\|v\|_H,
+\)
+and (ii)
+\(
+\|u\otimes u-v\otimes v\|_1
+\leqslant
+\bigl(
+\|u\|_H+\|v\|_H
+\bigr)
+\|u-v\|_H.
+\)
+\end{lemma}
+
+\begin{proof}
+For the first identity, recall that \((u\otimes v)h=\langle h,v\rangle_Hu\) for \(h\in H\), and that \((u\otimes v)^*=v\otimes u\). Hence \((u\otimes v)^*(u\otimes v)=(v\otimes u)(u\otimes v)=\|u\|_H^2(v\otimes v)\). The operator \(v\otimes v\) has the single nonzero eigenvalue \(\|v\|_H^2\), so \((u\otimes v)^*(u\otimes v)\) has the single nonzero eigenvalue \(\|u\|_H^2\|v\|_H^2\). Therefore \(u\otimes v\) has the single nonzero singular value \(\|u\|_H\|v\|_H\), and thus \(\|u\otimes v\|_1=\|u\|_H\|v\|_H\).
+
+For the second identity, write \(u\otimes u-v\otimes v=(u-v)\otimes u+v\otimes(u-v)\). By the triangle inequality and part (i), \(\|u\otimes u-v\otimes v\|_1\leqslant\|(u-v)\otimes u\|_1+\|v\otimes(u-v)\|_1=\|u-v\|_H\|u\|_H+\|v\|_H\|u-v\|_H=(\|u\|_H+\|v\|_H)\|u-v\|_H\), which proves the result.
+\end{proof}
+
+\begin{proposition}[Continuity of the Gaussian model parameters]
+\label{prop:Continuity of the covariance map}
+The parameter maps \(m_\Theta:E\to H\) and \(c_{k,\Theta}:E\to H\), for \(k\in\{1,\ldots,r\}\), are continuous. Moreover,
+\(
+C_\Theta:E\to\mathcal L_1^+(H)
+\)
+is continuous when \(\mathcal L_1^+(H)\) is equipped with the trace norm.
+\end{proposition}
+
+\begin{proof}
+The functional autoregressive transformer consists of continuous operations: bounded linear maps, Lipschitz nonlinearities, finite-dimensional softmax maps, residual connections, and metric projections onto closed balls. Consequently, \(h_\Theta:E\to\mathcal H\) is continuous.
+
+The coefficient heads are globally Lipschitz and hence continuous. Therefore the maps \(F\mapsto\mu_\Theta(F)\) and \(F\mapsto\gamma_{k,\Theta}(F)\) are continuous into \(\mathbb R^d\). Since \(\mathsf E_d:\mathbb R^d\to H\) is bounded, \(m_\Theta(F)=\mathsf E_d\mu_\Theta(F)\) and \(c_{k,\Theta}(F)=\mathsf E_d\gamma_{k,\Theta}(F)\) are continuous as maps into \(H\).
+
+It remains to prove trace-norm continuity of the covariance map. Let \(F_j\to F\) in \(E\). Then we have \(c_{k,\Theta}(F_j)\to c_{k,\Theta}(F)\) in \(H\) for every \(k\). Since the covariance floor is independent of the context,
+\[
+\begin{aligned}
+C_\Theta(F_j)-C_\Theta(F)
+=
+\sum_{k=1}^r
+\Bigl(
+c_{k,\Theta}(F_j)\otimes c_{k,\Theta}(F_j)
+-
+c_{k,\Theta}(F)\otimes c_{k,\Theta}(F)
+\Bigr).
+\end{aligned}
+\]
+Lemma~\ref{lem:rank-one operations} gives
+\[
+\|C_\Theta(F_j)-C_\Theta(F)\|_1
+\leqslant
+\sum_{k=1}^r
+\Bigl(
+\|c_{k,\Theta}(F_j)\|_H
++
+\|c_{k,\Theta}(F)\|_H
+\Bigr)
+\|c_{k,\Theta}(F_j)-c_{k,\Theta}(F)\|_H.
+\]
+For each \(k\), the final factor tends to zero. Since \(c_{k,\Theta}(F_j)\to c_{k,\Theta}(F)\), the first factor remains bounded. The sum is finite, so \(\|C_\Theta(F_j)-C_\Theta(F)\|_1\to0\).
+\end{proof}
+
+We now use a standard continuity property of Gaussian measures.
+
+\begin{proposition}[Continuity of the Gaussian parameter map]
+\label{prop:Continuity of the Gaussian parameter map}
+The map
+\(
+\mathfrak G:
+H\times\mathcal L_1^+(H)
+\to
+\mathcal P(H)\)
+defined by \(
+\mathfrak G(m,C)
+=
+\mathcal N(m,C)
+\)
+is continuous when \(H\) carries its norm topology, \(\mathcal L_1^+(H)\) the trace-norm topology, and \(\mathcal P(H)\) the topology of weak convergence.
+\end{proposition}
+
+\begin{proof}
+Suppose that \(m_j\to m\) in \(H\) and \(C_j\to C\) in trace norm. Then, we have the weak convergence
+\(
+\mathcal N(m_j,C_j)
+\Rightarrow
+\mathcal N(m,C)
+\)
+by \cite[Theorem~2.7.21]{Bogachev2018}. Hence \(\mathfrak G\) is sequentially continuous. Since the spaces involved are metrizable under the stated topologies, sequential continuity is equivalent to continuity.
+\end{proof}
+
+\begin{theorem}[Gaussian output kernel]
+\label{thm:Gaussian output kernel}
+The Gaussian output map
+\(
+Q_\Theta:
+E\times\mathcal B(H)
+\to
+[0,1]\)
+given by \(
+Q_\Theta(F,A)
+=
+\mathcal N
+\bigl(
+m_\Theta(F),
+C_\Theta(F)
+\bigr)(A),
+\)
+is a Markov transition kernel from \(E\) to \(H\).
+\end{theorem}
+
+\begin{proof}
+We verify the two requirements in Definition \ref{def:Markov transition kernel}
+
+\textit{Step 1: Probability measure.}
+For every \(F\in E\), Theorem~\ref{thm:Existence and uniqueness of the Gaussian output measure} shows that \(Q_\Theta(F,\cdot)=\mathcal N(m_\Theta(F),C_\Theta(F))\) is a Borel probability measure on \(H\).
+
+\textit{Step 2: Measurable dependence on the context.}
+Proposition~\ref{prop:Continuity of the covariance map} gives continuity of \(F\mapsto(m_\Theta(F),C_\Theta(F))\) from \(E\) to \(H\times\mathcal L_1^+(H)\). Proposition~\ref{prop:Continuity of the Gaussian parameter map} therefore implies that \(F\mapsto Q_\Theta(F,\cdot)\) is continuous, and hence Borel measurable, as a map from \(E\) into \(\mathcal P(H)\).
+
+For every \(A\in\mathcal B(H)\), the evaluation map \(\mu\mapsto\mu(A)\) is Borel measurable on \(\mathcal P(H)\). Consequently, \(F\mapsto Q_\Theta(F,A)\) is Borel measurable. Both requirements are satisfied, so \(Q_\Theta\) is a Markov transition kernel from \(E\) to \(H\).
+\end{proof}
+
+\begin{corollary}[Well-posed functional autoregressive chain]
+\label{cor:Well-posed functional autoregressive chain}
+The functional autoregressive transformer transition kernel
+\[
+P_\Theta(F,A)
+=
+\int_H
+\mathbf 1_A
+(f_1,\ldots,f_{n-1},g)
+\,Q_\Theta(F,\mathrm dg)
+\]
+defines a Markov transition kernel on \(E\). Consequently, for every initial probability measure on \(E\), the functional autoregressive transformer defines a time-homogeneous general-state-space Markov chain.
+\end{corollary}
+
+\begin{proof}
+Theorem~\ref{thm:Gaussian output kernel} establishes that \(Q_\Theta\) is a Markov transition kernel from \(E\) to \(H\). Proposition~\ref{prop:Markov transition kernel} then shows that \(P_\Theta\) is a Markov transition kernel on \(E\). Finally, Theorem~\ref{thm:Markov chain formulation} gives the corresponding time-homogeneous Markov chain.
+\end{proof}
+
+\subsection{Drift and minorisation ergodicity}\label{subsec:Drift and minorisation ergodicity}
+
+We now study the long-time behaviour of the recursive inference chain. The architecture provides two key ingredients: the deterministic context shift progressively removes the initial state, while the Gaussian output introduces uniformly nondegenerate randomness on the fixed space \(S_d\).
+
+We first use the uniform conditional second-moment bound to derive a geometric drift inequality in a weighted context norm. We then use the common Gaussian support and covariance bounds to obtain an output minorisation, which becomes a global \(n\)-step minorisation of the context kernel once the initial context has been shifted out. The \(n\)-step Doeblin condition yields existence, uniqueness, and uniform geometric convergence in total variation, while the drift estimate provides moment control.
+
+\begin{definition}[Weighted context norm]\label{def:Weighted context norm}
+Let \(\beta>1\). For \(F=(f_0,\ldots,f_{n-1})\in E\), define the \emph{weighted context norm}
+\(
+\|F\|_\beta^2
+=\sum_{j=0}^{n-1}\beta^j\|f_j\|_H^2
+\) and its corresponding \emph{Lyapunov function}
+\(
+V(F)=1+\|F\|_\beta^2.
+\)
+\end{definition}
+
+Since \(n\) is finite and \(\beta>1\), the weighted norm is equivalent to the usual product norm on \(E=H^n\). Indeed, for every \(F=(f_0,\ldots,f_{n-1})\in E\), \(\|F\|_{H^n}^2\leqslant\|F\|_\beta^2\leqslant\beta^{n-1}\|F\|_{H^n}^2\). Consequently, \((E,\|\cdot\|_\beta)\) has the same topology as \(H^n\). In particular, it remains a complete and separable Hilbert space.
+
+The weighted norm is chosen to reflect the shift structure of the autoregressive update. As context entries move one position to the left, their weights decrease by a factor \(\beta^{-1}\). To see this, let \(F=(f_0,\ldots,f_{n-1})\) and \(G=(g_0,\ldots,g_{n-1})\). After one transition, the deterministic coordinates are shifted one position to the left and their contribution to the squared weighted distance becomes
+\[
+\sum_{j=1}^{n-1}\beta^{j-1}\|f_j-g_j\|_H^2=\beta^{-1}\sum_{j=1}^{n-1}\beta^j\|f_j-g_j\|_H^2\leqslant\beta^{-1}\|F-G\|_\beta^2.
+\]
+Thus, the deterministic shift produces a contraction, while the newly generated coordinate will be controlled separately through its conditional second moment. The next step is therefore to control the only genuinely new contribution to the context norm: the generated function. The bounded mean and covariance factors imply that its conditional second moment is uniformly bounded over all possible contexts.
+
+
+\begin{lemma}[Uniform conditional second moment]\label{lem:Uniform conditional second moment}
+For every \(F\in E\),
+\(
+\int_H\|g\|_H^2Q_\Theta(F,\mathrm dg)
+\leqslant M_2,
+\)
+where
+\(
+M_2=M_m^2+d\sigma_0^2+\sum_{k=1}^rM_{C,k}^2<\infty.
+\)
+\end{lemma}
+
+\begin{proof}
+By Theorem \ref{thm:Covariance operator of a Gaussian random element}, we have the identity \(
+\int_H\|g\|_H^2Q_\Theta(F,\mathrm dg)
+=\|m_\Theta(F)\|_H^2+\operatorname{tr}\bigl(C_\Theta(F)\bigr).
+\)
+By Proposition \ref{prop:Uniform bound for the mean}, the mean term is bounded by \(M_m^2\). For the trace term,
+\[
+\operatorname{tr}\bigl(C_\Theta(F)\bigr)
+=\sigma_0^2\operatorname{tr}(\Pi_{S_d})+\sum_{k=1}^r\operatorname{tr}\!\bigl(c_{k,\Theta}(F)\otimes c_{k,\Theta}(F)\bigr)
+=d\sigma_0^2+\sum_{k=1}^r\|c_{k,\Theta}(F)\|_H^2
+\leqslant d\sigma_0^2+\sum_{k=1}^rM_{C,k}^2,
+\]
+where the first equality uses linearity of the trace, the second uses \(\operatorname{tr}(\Pi_{S_d})=d\) and \(\operatorname{tr}(c\otimes c)=\|c\|_H^2\), and the final inequality uses Proposition \ref{prop:Uniform bounds for covariance factors}
+\end{proof}
+
+Combining the contraction of the shifted coordinates with the uniform bound on the newly generated coordinate gives the required Lyapunov drift.
+
+\begin{proposition}[Geometric Foster--Lyapunov drift]\label{prop:Geometric Foster--Lyapunov drift}
+For every \(F\in E\), \(P_\Theta V(F)\leqslant\beta^{-1}V(F)+b,
+\)
+where
+\(
+b=1-\beta^{-1}+\beta^{n-1}M_2<\infty.
+\)
+\end{proposition}
+
+\begin{proof}
+Fix \(F=(f_0,\ldots,f_{n-1})\). Under one transition, the next context is
+\(
+F'=(f_1,\ldots,f_{n-1},g)\),
+where
+\(
+g\sim Q_\Theta(F,\cdot).
+\)
+Therefore
+\[
+\begin{aligned}
+P_\Theta V(F)
+&=
+\int_E V(G)\,P_\Theta(F,\mathrm dG)\\
+&=
+\int_H V(f_1,\ldots,f_{n-1},g)\,Q_\Theta(F,\mathrm dg)\\
+&=1+\sum_{j=1}^{n-1}\beta^{j-1}\|f_j\|_H^2
++\beta^{n-1}\int_H\|g\|_H^2Q_\Theta(F,\mathrm dg)\\
+&\leqslant1+\beta^{-1}\sum_{j=1}^{n-1}\beta^j\|f_j\|_H^2
++\beta^{n-1}M_2\\
+&\leqslant1+\beta^{-1}\|F\|_\beta^2+\beta^{n-1}M_2\\
+&=\beta^{-1}\bigl(1+\|F\|_\beta^2\bigr)
++\bigl(1-\beta^{-1}\bigr)+\beta^{n-1}M_2\\
+&=\beta^{-1}V(F)+b.
+\end{aligned}
+\]
+The first inequality uses Lemma~\ref{lem:Uniform conditional second moment}. The second uses the deterministic shift contraction.
+\end{proof}
+
+The factor \(\beta^{-1}\) in the drift estimate comes from the deterministic removal of the oldest context component, while the newly generated component contributes the bounded constant \(M_2\). The drift estimate controls the growth of the chain but does not by itself ensure that trajectories starting from different contexts can mix. For this, we use the nondegenerate Gaussian output. Because all conditional laws have the same support \(S_d\), uniformly bounded means, and uniformly bounded covariance eigenvalues, they share a common amount of probability mass on any fixed ball in \(S_d\).
+
+\begin{proposition}[Uniform minorisation of the output kernel]\label{prop:Uniform minorisation of the output kernel}
+Let us fix a constant \(R_0>0\), and let \(B_0=\{y\in S_d:\|y\|_H\leqslant R_0\}\) be the closed ball of radius \(R_0\) centred at the zero function in the approximation space \(S_d\). Define \(\nu\in\mathcal P(H)\) by \(\nu(A)=\lambda_{S_d}(A\cap B_0)/\lambda_{S_d}(B_0)\) for every \(A\in\mathcal B(H)\), where \(\lambda_{S_d}\) denotes the \(d\)-dimensional Lebesgue measure on \(S_d\). Let \(c_0=(2\pi)^{-d/2}\overline\lambda^{-d/2}\exp\!\left(-(R_0+M_m)^2/(2\underline\lambda)\right)\) and \(\varepsilon_0=c_0\lambda_{S_d}(B_0)\). Then \(\varepsilon_0\in(0,1]\) and, for every \(F\in E\) and \(A\in\mathcal B(H)\), \(Q_\Theta(F,A)\geqslant\varepsilon_0\nu(A)\).
+\end{proposition}
+
+\begin{proof}
+The measure \(\nu\) is a normalised Lebesgue measure on the finite-dimensional ball \(B_0\), viewed as a probability measure on \(H\) supported on \(S_d\). Proposition~\ref{prop:Admissibility of the covariance operator} gives that
+\(
+\|m_\Theta(F)\|_H\leqslant M_m
+\) and that
+\(
+\underline\lambda I_{S_d}\preceq C_\Theta(F)|_{S_d}
+\preceq\overline\lambda I_{S_d}.
+\)
+Lemma~\ref{lem:Uniform lower bound for Gaussian densities on a fixed ball} therefore gives
+\(
+q_F(y)\geqslant c_0\) for \( y\in B_0,
+\)
+where \(q_F\) is the density of \(Q_\Theta(F,\cdot)\) relative to \(\lambda_{S_d}\). Hence
+\[
+\begin{aligned}
+Q_\Theta(F,A)
+&=\int_{A\cap S_d}q_F(y)\lambda_{S_d}(\mathrm dy)\\
+&\geqslant\int_{A\cap B_0}q_F(y)\lambda_{S_d}(\mathrm dy)\\
+&\geqslant c_0\lambda_{S_d}(A\cap B_0)\\
+&=\varepsilon_0\nu(A).
+\end{aligned}
+\]
+Integrating the inequality over \(B_0\) also shows \(\varepsilon_0\leqslant Q_\Theta(F,B_0)\leqslant1\).
+\end{proof}
+
+The preceding proposition is a one-step minorisation of the newly generated function. It is not a one-step minorisation of the full context kernel, since the first \(n-1\) coordinates of \(P_\Theta(F,\cdot)\) are deterministic and depend on \(F\). However, after \(n\) transitions, every coordinate of the context has been generated by the model. Repeatedly applying the same one-step output minorisation at each generation step therefore produces a common product component in the \(n\)-step transition law.
+
+\begin{proposition}[Global \(n\)-step minorisation of the context kernel]\label{prop:Global n-step minorisation}
+Let \(\nu\) and \(\varepsilon_0\) be as in Proposition~\ref{prop:Uniform minorisation of the output kernel}. Let \(\nu^{\otimes n}\in\mathcal P(E)\) denote the \(n\)-fold product measure of \(\nu\), supported on \(S_d^n\subset E\), and defined for \(A\in\mathcal B(E)\) by
+\(
+\nu^{\otimes n}(A)
+=
+\int_H\cdots\int_H
+\mathbf 1_A(g_1,\ldots,g_n)\,
+\nu(\mathrm dg_1)\cdots\nu(\mathrm dg_n).
+\)
+Then, for every \(F\in E\) and \(A\in\mathcal B(E)\),
+\(
+P_\Theta^n(F,A)
+\geqslant
+\varepsilon_0^n\nu^{\otimes n}(A).
+\)
+\end{proposition}
+
+\begin{proof}
+We make the sequential conditioning explicit. Starting from \(F\), let \(g_1\) be the first generated function, let \(F^{(1)}\) be the resulting context, and continue recursively. After \(n\) steps all original context coordinates have been removed, and the final context is exactly
+\(
+(g_1,\ldots,g_n).
+\)
+Consequently,
+\[
+P_\Theta^n(F,A)
+=\int_{H^n}\mathbf 1_A(g_1,\ldots,g_n)
+Q_\Theta(F,\mathrm dg_1)
+Q_\Theta(F^{(1)},\mathrm dg_2)\cdots Q_\Theta(F^{(n-1)},\mathrm dg_n),
+\]
+where \(F^{(j)}\) is a measurable function of \(F,g_1,\ldots,g_j\).
+
+We now apply the output minorisation repeatedly, beginning with the innermost integral. For fixed \(g_1,\ldots,g_{n-1}\),
+\[
+\int_H\mathbf 1_A(g_1,\ldots,g_n)
+Q_\Theta(F^{(n-1)},\mathrm dg_n)
+\geqslant
+\varepsilon_0\int_H\mathbf 1_A(g_1,\ldots,g_n)\nu(\mathrm dg_n).
+\]
+The right-hand side is a non-negative measurable function of \(g_1,\ldots,g_{n-1}\). Applying the same argument to the preceding conditional kernel and iterating gives
+\[
+P_\Theta^n(F,A)
+\geqslant\varepsilon_0^n
+\int_{H^n}\mathbf 1_A(g_1,\ldots,g_n)
+\nu(\mathrm dg_1)\cdots\nu(\mathrm dg_n),
+\]
+which is \(\varepsilon_0^n\nu^{\otimes n}(A)\).
+\end{proof}
+
+The product measure appears because at each conditioning step the same context-independent measure \(\nu\) replaces the conditional output law. The proof would not produce a fixed product measure if the support or the minorising measure varied with the context.
+
+The preceding proposition is the key mixing property. It shows that the entire state space is a small set for the \(n\)-step kernel. Consequently, two arbitrary initial distributions share a common component after every block of \(n\) transitions, which yields a strict contraction in total variation.
+
+We can now combine the global \(n\)-step minorisation with the drift estimate. The minorisation gives existence, uniqueness, and geometric convergence of the invariant law, while the drift inequality provides the required moment control. The resulting theorem therefore describes both the distributional stability and the integrability of the long-run inference process.
+
+\begin{theorem}[Uniform geometric ergodicity of the functional autoregressive transformer]\label{thm:Uniform geometric ergodicity}
+Let \(P_\Theta\) be the transition kernel of the functional autoregressive transformer. Then the following statements hold.
+
+\begin{enumerate}
+    \item There exists a unique invariant probability measure \(\pi_\Theta\in\mathcal P(E)\) for \(P_\Theta\).
+
+    \item The invariant probability measure is supported on \(S_d^n\).
+
+    \item For every initial probability measure \(\mu\in\mathcal P(E)\) and every \(t\in\mathbb N_0\),
+    \(
+    d_{\mathrm{TV}}\bigl(\mu P_\Theta^t,\pi_\Theta\bigr)
+    \leqslant
+    (1-\varepsilon_0^n)^{\lfloor t/n\rfloor}.
+    \)
+    In particular, \(P_\Theta\) is uniformly geometrically ergodic in total variation. If \(\varepsilon_0<1\), one may take \(q_{\mathrm{TV}}=(1-\varepsilon_0^n)^{1/n}\) and \(M_{\mathrm{TV}}=(1-\varepsilon_0^n)^{-1}\). If \(\varepsilon_0=1\), convergence is exact after at most \(n\) steps.
+
+    \item The invariant probability measure has finite \(V\)-moment and satisfies
+    \[
+    \int_E V(F)\,\pi_\Theta(\mathrm dF)
+    \leqslant
+    \frac{b}{1-\beta^{-1}}.
+    \]
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+The proof is done in a few steps.
+
+\textit{Step 1: Contraction of the \(n\)-step kernel.}
+Proposition~\ref{prop:Global n-step minorisation} gives \(P_\Theta^n(F,A)\geqslant\varepsilon_0^n\nu^{\otimes n}(A)\) for every \(F\in E\) and \(A\in\mathcal B(E)\). Applying Lemma~\ref{lem:Doeblin contraction in total variation} to the Markov kernel \(P_\Theta^n\), with minorisation constant \(\varepsilon_0^n\) and reference probability measure \(\nu^{\otimes n}\), yields
+\(
+d_{\mathrm{TV}}\bigl(\mu_1P_\Theta^n,\mu_2P_\Theta^n\bigr)
+\leqslant
+(1-\varepsilon_0^n)d_{\mathrm{TV}}(\mu_1,\mu_2)
+\)
+for all \(\mu_1,\mu_2\in\mathcal P(E)\).
+
+Hence the map \(\mu\mapsto\mu P_\Theta^n\) is a strict contraction on \(\mathcal P(E)\) equipped with total variation distance. The space \(\mathcal P(E)\) is complete in total variation, since it is a closed subset of the Banach space of finite signed measures equipped with the total-variation norm. The Banach fixed-point theorem therefore gives a unique probability measure \(\pi_\Theta\in\mathcal P(E)\) satisfying \(\pi_\Theta P_\Theta^n=\pi_\Theta\).
+
+\textit{Step 2: Invariance and uniqueness for the one-step kernel.}
+The measure \(\pi_\Theta P_\Theta\) is also invariant under \(P_\Theta^n\), since
+\(
+(\pi_\Theta P_\Theta)P_\Theta^n
+=
+\pi_\Theta P_\Theta^{n+1}
+=
+(\pi_\Theta P_\Theta^n)P_\Theta
+=
+\pi_\Theta P_\Theta.
+\)
+By uniqueness of the \(P_\Theta^n\)-invariant probability measure, it follows that \(\pi_\Theta P_\Theta=\pi_\Theta\). Thus \(\pi_\Theta\) is invariant under \(P_\Theta\).
+
+Conversely, every \(P_\Theta\)-invariant probability measure is also \(P_\Theta^n\)-invariant. Since the latter has a unique invariant probability measure, \(\pi_\Theta\) is the unique invariant probability measure for \(P_\Theta\).
+
+\textit{Step 3: Convergence for all times.}
+For \(t\in\mathbb N_0\), write \(t=qn+s\), where \(q=\lfloor t/n\rfloor\) and \(0\leqslant s<n\). Then \(\mu P_\Theta^t=(\mu P_\Theta^s)P_\Theta^{qn}\). Repeated application of the \(n\)-step contraction gives
+\[
+\begin{aligned}
+d_{\mathrm{TV}}\bigl(\mu P_\Theta^t,\pi_\Theta\bigr)
+&=
+d_{\mathrm{TV}}\bigl((\mu P_\Theta^s)P_\Theta^{qn},
+(\pi_\Theta P_\Theta^s)P_\Theta^{qn}\bigr)\\
+&\leqslant
+(1-\varepsilon_0^n)^q
+d_{\mathrm{TV}}\bigl(\mu P_\Theta^s,\pi_\Theta P_\Theta^s\bigr)\\
+&\leqslant
+(1-\varepsilon_0^n)^q\\
+&=
+(1-\varepsilon_0^n)^{\lfloor t/n\rfloor},
+\end{aligned}
+\]
+where the second inequality uses the non-expansiveness of Markov kernels in total variation and the invariance \(\pi_\Theta P_\Theta^s=\pi_\Theta\).
+
+If \(\varepsilon_0<1\), define \(q_{\mathrm{TV}}=(1-\varepsilon_0^n)^{1/n}\). Since \(\lfloor t/n\rfloor\geqslant t/n-1\),
+\(
+(1-\varepsilon_0^n)^{\lfloor t/n\rfloor}
+\leqslant
+(1-\varepsilon_0^n)^{-1}q_{\mathrm{TV}}^t.
+\)
+Thus the definition of uniform geometric ergodicity, Definition \ref{def:Uniform geometric ergodicity}, holds with \(M_{\mathrm{TV}}=(1-\varepsilon_0^n)^{-1}\). If \(\varepsilon_0=1\), the \(n\)-step contraction factor is zero, so \(\mu P_\Theta^n=\pi_\Theta\) for every \(\mu\in\mathcal P(E)\), and therefore convergence is exact for every \(t\geqslant n\).
+
+\textit{Step 4: Support of the invariant probability measure.}
+After \(n\) transitions, every coordinate of the context is a generated output and therefore belongs to \(S_d\). Hence \(P_\Theta^n(F,S_d^n)=1\) for every \(F\in E\). Using invariance under \(P_\Theta^n\),
+\(
+\pi_\Theta(S_d^n)
+=
+(\pi_\Theta P_\Theta^n)(S_d^n)
+=
+1.
+\)
+Thus \(\pi_\Theta\) is supported on \(S_d^n\).
+
+\textit{Step 5: Invariant \(V\)-moment.}
+Choose the initial probability measure \(\mu_0=\nu^{\otimes n}\). Since \(\nu\) is supported on the bounded set \(B_0\subset S_d\), the product measure \(\mu_0\) is supported on the bounded set \(B_0^n\subset S_d^n\), and hence \(\mu_0(V)<\infty\). Iterating Proposition~\ref{prop:Geometric Foster--Lyapunov drift} gives
+\[
+\mu_0P_\Theta^t(V)
+\leqslant
+\beta^{-t}\mu_0(V)
++
+b\sum_{j=0}^{t-1}\beta^{-j}
+\leqslant
+\beta^{-t}\mu_0(V)
++
+\frac{b}{1-\beta^{-1}}.
+\]
+The total-variation convergence established above implies weak convergence \(\mu_0P_\Theta^t\Rightarrow\pi_\Theta\). Since \(V\) is continuous and non-negative, the Portmanteau theorem yields
+\[
+\pi_\Theta(V)
+\leqslant
+\liminf_{t\to\infty}\mu_0P_\Theta^t(V)
+\leqslant
+\frac{b}{1-\beta^{-1}}.
+\]
+This proves the claimed finite \(V\)-moment bound.
+\end{proof}
+
+\begin{remark}[Roles of Doeblin minorisation and drift]\label{rem:Roles of Doeblin minorisation and drift}
+The global \(n\)-step Doeblin condition alone already supplies existence, uniqueness, and uniform total-variation convergence. The drift inequality is not needed for those three conclusions in the present globally minorised model. Its additional role is to quantify moment stability and to prove that the invariant law has a finite weighted second moment. It also identifies the part of the argument that would remain useful in future variants with only local small sets, where a full Harris theorem would be required.
+\end{remark}
+
+\begin{remark}[Size of the minorisation constant]\label{rem:Size of the minorisation constant}
+The result is qualitative rather than a claim of a practically sharp mixing rate. The lower bound contains
+\(
+\exp\left[-{(R_0+M_m)^2}/{(2\sigma_0^2})\right]
+\)
+and is then raised to the power \(n\). It may therefore be extremely small when \(\sigma_0\) is small, the approximation dimension is large, or the context is long. The theorem certifies geometric ergodicity but does not imply that the displayed rate is numerically useful.
+\end{remark}
+
+\begin{remark}[Inference ergodicity is separate from pretraining dependence]\label{rem:Inference ergodicity separate from pretraining}
+The statements in Theorem~\ref{thm:Uniform geometric ergodicity} concern the stochastic chain generated recursively by a trained functional autoregressive transformer. They are not assumptions on the data used to train the model. The fixed-parameter generalisation results in Section~\ref{sec:Fixed-parameter pretraining generalisation} instead impose dependence conditions directly on the training observations. Inference-chain geometric ergodicity is not logically required for those results.
+\end{remark}
+
+\subsection{Modelling trade-offs}\label{subsec:Interpretation and modelling trade-offs}
+
+The main modelling restrictions of the functional autoregressive transformer arise from the structure of its output space, conditional distribution, and finite context.
+
+\paragraph{Fixed approximation space.}
+All generated functions lie in the fixed finite-dimensional subspace \(S_d\subset H\). This introduces a genuine approximation--resolution trade-off. If dynamically important modes of the target process have non-negligible components in \(S_d^\perp\), then these components cannot be recovered by any choice of transformer parameters, and an irreducible projection error remains. Increasing the dimension \(d\) enlarges the class of functions that can be represented and therefore improves the potential approximation fidelity. However, it also increases the dimension of the conditional Gaussian density and may substantially deteriorate the explicit minorisation constant obtained in the ergodicity analysis. The choice of \(S_d\) must therefore balance representational accuracy against the quantitative strength of the resulting probabilistic bounds.
+
+\paragraph{Nondegenerate covariance floor.}
+The covariance operator contains the fixed component
+\(
+\sigma_0^2\Pi_{S_d}\), \(\sigma_0>0\),
+which ensures nondegeneracy in every direction of \(S_d\). This assumption is central to the common-support and minorisation arguments, since it provides a uniform lower spectral bound for the conditional covariance. However, it prevents the conditional distribution from becoming exactly deterministic. For deterministic PDE dynamics, for example, the true conditional law may be a Dirac measure, whereas the model necessarily retains positive variance in every retained mode. Choosing \(\sigma_0\) small allows the conditional law to approximate deterministic transitions closely over finite prediction horizons, but the corresponding Gaussian density lower bound becomes increasingly small. Consequently, improved approximation to deterministic dynamics comes at the cost of a weaker quantitative ergodicity certificate.
+
+\paragraph{Gaussian conditional output law.}
+For every context, the conditional distribution of the next function is represented by a single Gaussian measure. This provides a tractable probabilistic model with explicit moments, covariance structure, densities on \(S_d\), and Wasserstein formulae. It nevertheless restricts the class of transition laws that can be represented exactly. In particular, a single Gaussian cannot describe strongly multimodal conditional distributions or distinct transition regimes without averaging them into a unimodal law. Mixtures of Gaussian measures or more expressive generative distributions could address this limitation, but their well-posedness, common-support properties, and minorisation theory would require a separate analysis.
+
+\paragraph{Finite context length.}
+The model conditions each prediction on the preceding \(n\) functions, so dependencies beyond this window must be encoded through the current context. Increasing \(n\) allows longer temporal dependence but enlarges the state space. It also weakens the explicit ergodicity bound, since context-level minorisation is obtained only after \(n\) steps and involves the \(n\)-fold product of the one-output minorisation constant.
+
+\paragraph{Finite-horizon prediction and asymptotic inference.}
+There is a distinction between finite-horizon predictive behaviour and the asymptotic behaviour of recursive stochastic inference. The conditional mean can approximate periodic, conservative, oscillatory, or weakly dissipative dynamics over the time horizons relevant to prediction. Nevertheless, the repeated injection of nondegenerate Gaussian noise on the fixed space \(S_d\), together with the bounded conditional parameters, yields a uniformly geometrically ergodic context chain.

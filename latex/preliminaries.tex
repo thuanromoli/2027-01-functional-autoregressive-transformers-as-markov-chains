@@ -1,0 +1,701 @@
+\section{Preliminaries}\label{sec:Preliminaries}
+This section collects the mathematical concepts required to define functional autoregressive transformers and to analyse the stochastic processes they induce. We first set notation and introduce the Galerkin-type approximation space \(S_d\). We then recall Gaussian measures on Hilbert spaces, including densities relative to finite-dimensional Lebesgue measure on \(S_d\). Next, we collect the general-state-space Markov-chain notions needed for drift, minorisation, and total-variation geometric ergodicity. The optimal-transport material is used for Gaussian comparison, the pretraining loss, metric dependence, and the Lipschitz regularity of the conditional output law. Finally, we define functional autoregressive models and the function-space transformer architecture studied throughout the thesis.
+
+\subsection{Notation}\label{subsec:Notation}
+
+We denote by \(\mathbb N=\{1,2,\ldots\}\) the set of positive integers and by \(\mathbb N_0=\{0,1,2,\ldots\}\) the set of non-negative integers. For \(N\in\mathbb N\), we write \([N]=\{1,\ldots,N\}\).
+
+For vectors in \(\mathbb R^d\), \(\langle\cdot,\cdot\rangle_2\) and \(\|\cdot\|_2\) denote the Euclidean inner product and norm. The \(d\times d\) identity matrix is denoted by \(I_d\), and the transpose of a matrix \(A\) by \(A^\top\). For self-adjoint operators or symmetric matrices on the same space, \(A\preceq B\) means that \(B-A\) is non-negative.
+
+Unless otherwise specified, let \(H\) denote a real separable Hilbert space with inner product \(\langle\cdot,\cdot\rangle_H\) and norm \(\|\cdot\|_H\). The zero element of \(H\) is denoted by \(0_H\), or simply \(0\) when no ambiguity can arise.
+
+For a fixed context length \(n\in\mathbb N\), we denote the product space by \(E=H^n\). Elements of \(E\) are written using capital letters, for example \(F=(f_0,\ldots,f_{n-1})\), where each \(f_j\in H\). Unless otherwise specified, \(E\) is equipped with its product topology and corresponding Borel \(\sigma\)-algebra. Its zero element is denoted by \(0_E=(0_H,\ldots,0_H)\).
+
+For a topological space \(X\), we denote its Borel \(\sigma\)-algebra by \(\mathcal B(X)\), and its set of Borel probability measures by \(\mathcal P(X)\). If \(X,d\) is a metric space, we denote the set of Borel probability measures with finite second moment by \(\mathcal P_2(X)=\{\mu\in\mathcal P(X):\int_X d(x,x_0)^2\,\mu(\mathrm dx)<\infty,\text{ for fixed }x_0\in X\}\). This definition does not depend on the choice of \(x_0\).
+
+The Dirac probability measure concentrated at \(x\in X\) is denoted by \(\delta_x\). For a measurable set \(A\), its indicator function is denoted by \(\mathbf 1_A\). If \(T:X\to Y\) is a measurable map and \(\mu\in\mathcal P(X)\), the pushforward of \(\mu\) under \(T\) is denoted by \(T_\#\mu\), so that \((T_\#\mu)(A)=\mu(T^{-1}(A))\) for every \(A\in\mathcal B(Y)\).
+
+For probability measures \(\mu,\nu\in\mathcal P(X)\), we write \(\mu\Rightarrow\nu\) to denote weak convergence. When \(X\) is equipped with a metric and \(\mu,\nu\in\mathcal P_2(X)\), the set of couplings of \(\mu\) and \(\nu\) is denoted by \(\Pi(\mu,\nu)\).
+
+We denote by \(\mathcal L(H)\) the space of bounded linear operators from \(H\) to itself. For \(K\in\mathcal L(H)\), its adjoint is denoted by \(K^*\). The identity operator on \(H\) is denoted by \(I_H\). The space of self-adjoint, non-negative, trace-class operators on \(H\) is denoted by \(\mathcal L_1^+(H)\). For a trace-class operator \(K\), its trace norm is denoted by \(\|K\|_1\).
+
+For normed spaces \(X\) and \(Y\), we denote by \(\mathcal L(X,Y)\) the space of bounded linear operators from \(X\) to \(Y\), and simplify the notation to \(\mathcal L(X)=\mathcal L(X,X)\). For \(T\in\mathcal L(X,Y)\), its operator norm is defined by \(\|T\|_{\mathrm{op}}=\sup_{\|x\|_X\leqslant1}\|Tx\|_Y=\sup_{x\neq0}\{{\|Tx\|_Y}/{\|x\|_X}\}. \) Consequently, \(\|Tx\|_Y\leqslant\|T\|_{\mathrm{op}}\|x\|_X\) for every \(x\in X\).
+
+Random elements are denoted by capital letters when convenient, while their realisations are denoted by the corresponding lowercase letters. Probability measures are generally denoted by Greek letters such as \(\mu\), \(\nu\), and \(\pi\), while probability kernels are denoted by capital letters such as \(P\) and \(Q\). The notation ``a.s.'' stands for almost surely.
+
+
+
+\subsection{Finite-dimensional approximation spaces}\label{subsec:Finite-dimensional approximation spaces}
+The probabilistic output of the functional autoregressive transformer will be constructed in a fixed finite-dimensional subspace of a Hilbert space \(H\). Introducing such a space serves two purposes. First, it provides a finite-dimensional representation in which the conditional mean and covariance can be parameterised through coefficient vectors, making the output distribution computationally tractable while retaining a function-space interpretation. Second, requiring the same subspace to be used for every input context ensures that all conditional Gaussian measures are supported on a common space. This common support will be essential later when deriving a uniform Gaussian density lower bound and the minorisation condition used in the ergodicity analysis.
+
+This construction is naturally interpreted through the Galerkin approximation framework, in which an infinite-dimensional problem is approximated on a sequence of finite-dimensional subspaces; see, for example, \cite{QuarteroniValli1994}. The definitions and identities used below follow from the standard theory of orthonormal systems and orthogonal projections in Hilbert spaces; see \cite[Chapter~5]{Brezis2011}.
+
+Fix \(d\in\mathbb N\), \(d\leqslant\dim H\), and let \((e_1,\ldots,e_d)\subset H\) be an orthonormal family. We define the finite-dimensional approximation space with \(S_d=\operatorname{span}\{e_1,\ldots,e_d\}\subset H\).
+Since \(S_d\) is finite-dimensional, it is a closed subspace of \(H\) and therefore admits a well-defined orthogonal projection. The dimension \(d\) controls the expressive resolution of the probabilistic output: increasing \(d\) enlarges the class of functions that can be represented, whereas components orthogonal to \(S_d\) cannot be produced by the model.
+
+The choice of the orthonormal family is application dependent. For example, \(S_d\) may be generated by the first \(d\) elements of a Fourier or wavelet basis, by leading functional principal components, or by a globally learned collection of basis functions. The particular construction of the basis is not required for the analysis below. The essential structural assumption is that \(S_d\) is fixed once the model is specified and does not depend on the functional context \(F\). Consequently, the conditional mean and all covariance directions introduced later can be constrained to the same space \(S_d\), ensuring that every conditional Gaussian output has the same finite-dimensional support.
+
+\begin{definition}[Synthesis and analysis operators]\label{def:Synthesis and analysis operators}
+The \emph{synthesis operator} \(\mathsf E_d:\mathbb R^d\to S_d\subset H\) is defined by \(\mathsf E_d a=\sum_{j=1}^d a_j e_j\) for \(a=(a_1,\ldots,a_d)\in\mathbb R^d\). The corresponding \emph{analysis operator} \(\mathsf E_d^*:H\to\mathbb R^d\) is defined by \(\mathsf E_d^*f=(\langle f,e_1\rangle_H,\ldots,\langle f,e_d\rangle_H)\). We denote the orthogonal projection from \(H\) onto \(S_d\) by \(\Pi_{S_d}\).
+\end{definition}
+
+The synthesis operator identifies a vector of coefficients in \(\mathbb R^d\) with the corresponding function in \(S_d\), while the analysis operator extracts the coefficients of a function along the orthonormal family \((e_1,\ldots,e_d)\). The following proposition recalls the basic relations between these operators.
+
+\begin{proposition}[Basic identities for the approximation space]\label{prop:Basic identities for the approximation space}
+The synthesis and analysis operators satisfy \(\mathsf E_d^*\mathsf E_d=I_d\) and \(\mathsf E_d\mathsf E_d^*=\Pi_{S_d}\). Moreover, \(\mathsf E_d\) is an isometry, so that \(\|\mathsf E_d a\|_H=\|a\|_2\) for every \(a\in\mathbb R^d\), and \(\|\Pi_{S_d}\|_{\mathrm{op}}=1\).
+\end{proposition}
+
+\begin{proof}
+We prove each statement in order. Let \(a=(a_1,\ldots,a_d)\in\mathbb R^d\). For each \(i\in\{1,\ldots,d\}\), orthonormality gives \((\mathsf E_d^*\mathsf E_d a)_i=\langle\sum_{j=1}^d a_j e_j,e_i\rangle_H=\sum_{j=1}^d a_j\langle e_j,e_i\rangle_H=a_i\). Hence \(\mathsf E_d^*\mathsf E_d a=a\) for every \(a\in\mathbb R^d\), and therefore \(\mathsf E_d^*\mathsf E_d=I_d\).
+
+Now let \(f\in H\). By definition of the two operators, \(\mathsf E_d\mathsf E_d^*f=\sum_{j=1}^d\langle f,e_j\rangle_H e_j\). Since \((e_1,\ldots,e_d)\) is an orthonormal basis of \(S_d\), this is precisely the orthogonal projection of \(f\) onto \(S_d\). Thus \(\mathsf E_d\mathsf E_d^*=\Pi_{S_d}\).
+
+To prove the isometry, \(\|\mathsf E_d a\|_H^2=\langle\sum_{i=1}^d a_i e_i,\sum_{j=1}^d a_j e_j\rangle_H=\sum_{i,j=1}^d a_i a_j\langle e_i,e_j\rangle_H=\sum_{j=1}^d a_j^2=\|a\|_2^2\), by orthogonality. Taking square roots yields \(\|\mathsf E_d a\|_H=\|a\|_2\).
+
+Finally, since \(\Pi_{S_d}\) is an orthogonal projection, \(\|\Pi_{S_d}f\|_H\leqslant\|f\|_H\) for every \(f\in H\), so \(\|\Pi_{S_d}\|_{\mathrm{op}}\leqslant1\). On the other hand, for any nonzero \(f\in S_d\), \(\Pi_{S_d}f=f\), and therefore \(\|\Pi_{S_d}f\|_H/\|f\|_H=1\). Hence \(\|\Pi_{S_d}\|_{\mathrm{op}}=1\).
+\end{proof}
+
+
+\subsection{Gaussian random elements on Hilbert spaces}\label{subsec:Gaussian random elements on Hilbert spaces}
+
+We recall the basic theory of Gaussian random elements on separable Hilbert spaces that will be used to define the probabilistic output of the functional autoregressive transformer in Section \ref{subsec:Functional autoregressive transformer}. For a comprehensive treatment, we refer to \cite{Bogachev1998}.
+Let \(H\) be a real separable Hilbert space with inner product \(\langle\cdot,\cdot\rangle_H\) and norm \(\|\cdot\|_H\).
+
+\begin{definition}[Gaussian random element]
+An \(H\)-valued random element \(X\) is called \emph{Gaussian} if, for every \(h\in H\), the real-valued random variable \(\langle X,h\rangle_H\) is Gaussian. If \(X\) is Gaussian, then its law is called a \emph{Gaussian measure} on \(H\).
+\end{definition}
+
+The definition can be understood as an infinite-dimensional extension of the usual notion of a Gaussian random vector. Rather than requiring the random element itself to possess a density, which is generally not meaningful in infinite dimensions, we require every one-dimensional projection of the random element to be Gaussian.
+
+\begin{example}[]
+Let \(m,c\in H\) and let \(\xi\sim\mathcal N(0,1)\). Define \(X=m+\xi c\). Then \(X\) is an \(H\)-valued Gaussian random element. Indeed, for every \(h\in H\), \(\langle X,h\rangle_H=\langle m,h\rangle_H+\xi\langle c,h\rangle_H\), which is a real Gaussian random variable.
+
+Although \(X\) takes values in the infinite-dimensional space \(H\), all of its randomness lies in the single direction \(c\). This example will later generalise to the finite-rank Gaussian construction used by the functional autoregressive transformer.
+\end{example}
+
+\begin{theorem}[Finite moments of Gaussian random elements]\label{thm:Finite moments of Gaussian random elements}
+Let \(H\) be a real separable Hilbert space and let \(X\) be an \(H\)-valued Gaussian random element. Then, for every \(p\geqslant1\), \(\mathbb E\bigl[\|X\|_H^p\bigr]<\infty\).
+\end{theorem}
+
+\begin{proof}
+By Fernique theorem \parencite[Theorem 2.8.5.]{Bogachev1998}, there exists \(\alpha>0\) such that \(\mathbb E\left[\exp\left(\alpha\|X\|_H^2\right)\right]<\infty\). Fix \(p\geqslant1\). Since exponential growth dominates polynomial growth, there exists a constant \(C_{p,\alpha}<\infty\) such that \(x^p\leqslant C_{p,\alpha}\exp(\alpha x^2)\) for every \(x\geqslant0\). Applying this inequality with \(x=\|X\|_H\) and taking expectations gives \(\mathbb E\bigl[\|X\|_H^p\bigr]\leqslant C_{p,\alpha}\mathbb E\left[\exp\left(\alpha\|X\|_H^2\right)\right]<\infty\). Hence every polynomial moment of \(\|X\|_H\) is finite.
+\end{proof}
+
+The preceding theorem guarantees the integrability required to define the mean and covariance of an \(H\)-valued Gaussian random element. We may therefore introduce the following definitions.
+
+\begin{definition}[Mean and covariance operator]
+Let \(X\) be a Gaussian random element. The \emph{mean} of \(X\) is the unique element \(m\in H\), denoted \(m=\mathbb E[X]\), such that, for every \(h\in H\), \(\langle m,h\rangle_H=\mathbb E[\langle X,h\rangle_H]\). The \emph{covariance operator} of \(X\) is the unique bounded linear operator \(C:H\to H\) characterised by \(\langle Ch,k\rangle_H=\mathbb E[\langle X-m,h\rangle_H\langle X-m,k\rangle_H]\) for every \(h,k\in H\).
+\end{definition}
+
+The mean and covariance operator are therefore the infinite-dimensional analogue of the mean vector and covariance matrix of a Gaussian random variable.
+
+\begin{definition}[Rank-one operator]
+For \(u,v\in H\), the rank-one operator \(u\otimes v:H\to H\) is defined by \(
+(u\otimes v)h=\langle v,h\rangle_Hu\), for any \(h\in H\).
+\end{definition}
+
+\begin{example}[]
+Consider as in the previous example the Gaussian random element \(X=m+\xi c\), where \(m,c\in H\) and \(\xi\sim\mathcal N(0,1)\). Since \(\mathbb E[\xi]=0\), the mean of \(X\) is \(m\). To identify its covariance operator, let \(h,k\in H\). Then
+\[
+\langle Ch,k\rangle_H=\mathbb E\bigl[\langle X-m,h\rangle_H\langle X-m,k\rangle_H\bigr]=\mathbb E[\xi^2]\langle c,h\rangle_H\langle c,k\rangle_H=\langle c,h\rangle_H\langle c,k\rangle_H = \langle (c\otimes c)h,k\rangle_H.
+\]
+Hence, the covariance operator of \(X\) is \(C=c\otimes c\). Thus, the function \(c\) determines the direction of variation, while its norm controls the magnitude of that variation.
+\end{example}
+
+\begin{definition}[Self-adjoint, non-negative, trace-class operators]
+A bounded linear operator \(C:H\to H\) is called (i) \emph{self-adjoint} if \(\langle Ch,k\rangle_H=\langle h,Ck\rangle_H\) for every \(h,k\in H\), and (ii) \emph{non-negative} if \(\langle Ch,h\rangle_H\geqslant0\) for every \(h\in H\). A non-negative self-adjoint operator \(C\) is called (iii) \emph{trace class} if
+\[
+\operatorname{tr}(C)=\sum_{j=1}^{\infty}\langle Ce_j,e_j\rangle_H<\infty,
+\]
+where \((e_j)_{j\geqslant1}\) is any orthonormal basis of \(H\). We denote the collection of self-adjoint, non-negative, trace-class bounded linear operators on \(H\) by \(\mathcal L_1^+(H)\).
+\end{definition}
+
+The following result characterises the covariance operators of Gaussian measures on a separable Hilbert space.
+
+\begin{theorem}[Covariance operator of a Gaussian random element]\label{thm:Covariance operator of a Gaussian random element}
+Let \(X\) be an \(H\)-valued Gaussian random element with mean \(m\) and covariance operator \(C\). Then \(C\in\mathcal L_1^+(H)\) and \(\operatorname{tr}(C)=\mathbb E\bigl[\|X-m\|_H^2\bigr]\). Consequently, \(\mathbb E\bigl[\|X\|_H^2\bigr]=\|m\|_H^2+\operatorname{tr}(C)
+\).
+\end{theorem}
+
+\begin{proof}
+Let \(Y=X-m\). Then \(Y\) is a centred Gaussian random element with covariance operator \(C\). We first prove the covariance properties for the centred variable \(Y\), and then recover the final second-moment identity for \(X\).
+
+We first show that \(C\) is self-adjoint by computing directly for \(h,k\in H\):
+\[
+\langle Ch,k\rangle_H=\mathbb E[\langle Y,h\rangle_H\langle Y,k\rangle_H]=\mathbb E[\langle Y,k\rangle_H\langle Y,h\rangle_H]=\langle Ck,h\rangle_H=\langle h,Ck\rangle_H.
+\]
+Next, \(C\) is non-negative since \(\langle Ch,h\rangle_H=\mathbb E[\langle Y,h\rangle_H^2]\geqslant0\). \newline
+It remains to prove that \(C\) is trace class. Let \((e_j)_{j\geqslant1}\) be an orthonormal basis of \(H\). Then,
+\[\operatorname{tr}(C)=\sum_{j=1}^{\infty}\langle Ce_j,e_j\rangle_H=\sum_{j=1}^{\infty}\mathbb E[\langle Y,e_j\rangle_H^2]=\mathbb E\left[\sum_{j=1}^{\infty}\langle Y,e_j\rangle_H^2\right]=\mathbb E[\|Y\|_H^2]=\mathbb E[\|X-m\|_H^2],
+\]
+where the first equality is the definition of the trace for a non-negative operator, the second follows from the definition of the covariance operator, the third follows from Tonelli's theorem since all terms are non-negative, the fourth follows from Parseval's identity, and the final equality uses \(Y=X-m\).
+
+Finally, since \(X=m+Y\), we have \(\|X\|_H^2=\|m\|_H^2+2\langle m,Y\rangle_H+\|Y\|_H^2\). Taking expectations gives \(\mathbb E[\|X\|_H^2]=\|m\|_H^2+2\mathbb E[\langle m,Y\rangle_H]+\mathbb E[\|Y\|_H^2]\). Since \(Y\) is centred, \(\mathbb E[Y]=0\), and therefore \(\mathbb E[\langle m,Y\rangle_H]=0\). Using the trace identity above, we conclude that \(\mathbb E[\|X\|_H^2]=\|m\|_H^2+\operatorname{tr}(C)\).
+\end{proof}
+
+Thus, in infinite dimensions, not every bounded non-negative operator can serve as the covariance of an \(H\)-valued Gaussian random element. The trace-class condition ensures that the total variance of the random element is finite.
+
+The converse is also true and provides the fundamental existence result used throughout this thesis. For a proof, we refer to Bogachev \parencite[Theorem 2.3.1.]{Bogachev1998}
+
+\begin{theorem}[Existence and uniqueness of Gaussian random elements]\label{thm:Existence and uniqueness of Gaussian random elements}
+Let \(m\in H\) and \(C\in\mathcal L_1^+(H)\). Then there exists an \(H\)-valued Gaussian random element \(X\) with mean \(m\) and covariance operator \(C\). Moreover, the distribution of \(X\) is uniquely determined by \(m\) and \(C\). In other words, if \(X_1\) and \(X_2\) are \(H\)-valued Gaussian random elements with the same mean \(m\) and covariance operator \(C\), then \(X_1\) and \(X_2\) have the same law. We denote this common law by \(\mathcal N(m,C)\).
+\end{theorem}
+
+\subsection{Gaussian measures supported on the approximation space}
+\label{subsec:Gaussian measures supported on the approximation space}
+
+The Gaussian-measure results above apply to probability measures on the full Hilbert space \(H\). The output distributions considered later have additional structure: their randomness is confined to the fixed finite-dimensional approximation space \(S_d\). It is therefore useful to recall explicitly how the general Hilbert-space Gaussian theory reduces to the familiar finite-dimensional Gaussian theory on \(S_d\).
+
+This distinction will be important in the ergodicity analysis. Although the covariance operators used by the functional autoregressive transformer are degenerate when regarded as operators on the full infinite-dimensional space \(H\), their restrictions to \(S_d\) are uniformly positive definite. Consequently, the corresponding Gaussian measures admit ordinary finite-dimensional densities with respect to Lebesgue measure on \(S_d\). Uniform control of these densities will later provide the common minorisation measure for the autoregressive transition kernel.
+
+Using the synthesis operator \(\mathsf E_d:\mathbb R^d\to S_d\), we identify \(S_d\) isometrically with \(\mathbb R^d\). Let \(\lambda_d\) denote Lebesgue measure on \(\mathbb R^d\), and define the corresponding \(d\)-dimensional Lebesgue measure on \(S_d\) by
+\(
+\lambda_{S_d}=(\mathsf E_d)_\#\lambda_d.
+\)
+This is a Lebesgue measure on the finite-dimensional space \(S_d\); no infinite-dimensional Lebesgue measure on \(H\) is being introduced.
+
+\begin{proposition}[Gaussian density on the approximation space]
+\label{prop:Gaussian density on the approximation space}
+Let \(m\in S_d\), and let \(C\in\mathcal L_1^+(H)\) satisfy \(\operatorname{Ran}(C)\subseteq S_d\). Suppose that the restriction \(C|_{S_d}:S_d\to S_d\) is positive definite. Then the Gaussian measure \(\mathcal N(m,C)\) is supported on \(S_d\) and is absolutely continuous with respect to \(\lambda_{S_d}\). Its density is
+\[
+q_{m,C}(y)
+=
+(2\pi)^{-d/2}
+\textstyle
+\det_{S_d}(C)^{-1/2}
+\exp\left(
+-\frac12
+\left\langle
+(C|_{S_d})^{-1}(y-m),y-m
+\right\rangle_H
+\right),
+\qquad y\in S_d,
+\]
+where \(\det_{S_d}(C)\) is the determinant of the matrix representing \(C|_{S_d}\) in the orthonormal basis \((e_1,\ldots,e_d)\).
+\end{proposition}
+
+\begin{proof}
+Write \(m=\mathsf E_d\mu\) for some \(\mu\in\mathbb R^d\), and define
+\(
+\Sigma=\mathsf E_d^*C\mathsf E_d\in\mathbb R^{d\times d}.
+\)
+Since \(C|_{S_d}\) is positive definite and \(\mathsf E_d\) is an isometric isomorphism from \(\mathbb R^d\) onto \(S_d\), the matrix \(\Sigma\) is symmetric and positive definite.
+
+If \(Z\sim\mathcal N(\mu,\Sigma)\) in \(\mathbb R^d\), then \(\mathsf E_dZ\) is an \(H\)-valued Gaussian random element with mean \(m\), covariance \(C\), and values in \(S_d\). Hence, \(
+\mathcal N(m,C)
+=
+(\mathsf E_d)_\#
+\mathcal N(\mu,\Sigma).
+\)
+The Euclidean Gaussian \(\mathcal N(\mu,\Sigma)\) has the usual density with respect to \(\lambda_d\). Transporting this density through the isometry \(\mathsf E_d\), together with the definition \(\lambda_{S_d}=(\mathsf E_d)_\#\lambda_d\), gives the result.
+\end{proof}
+
+The density is an ordinary finite-dimensional Gaussian density on \(S_d\). In particular, no claim is made that \(\mathcal N(m,C)\) possesses a Lebesgue density on the ambient infinite-dimensional space \(H\).
+
+The next result extracts the property that will be needed in the minorisation argument. If the means remain in a fixed bounded set and the covariance operators are uniformly bounded above and below on \(S_d\), then all of the corresponding Gaussian densities are bounded uniformly away from zero on any fixed bounded subset of \(S_d\).
+
+\begin{lemma}[]
+\label{lem:Uniform lower bound for Gaussian densities on a fixed ball}
+Let \(M,R_0<\infty\) and \(0<\underline\lambda\leqslant\overline\lambda<\infty\). Suppose that \(m\in S_d\) and \(C\in\mathcal L_1^+(H)\) satisfy
+\(
+\|m\|_H\leqslant M,
+\)
+\(
+\operatorname{Ran}(C)\subseteq S_d,
+\)
+and
+\(
+\underline\lambda I_{S_d}
+\preceq
+C|_{S_d}
+\preceq
+\overline\lambda I_{S_d}.
+\)
+Then, for every \(y\in B_{S_d}(0,R_0)\),
+\[
+q_{m,C}(y)
+\geqslant
+(2\pi)^{-d/2}
+\overline\lambda^{-d/2}
+\exp\left(
+-\frac{(R_0+M)^2}{2\underline\lambda}
+\right)
+>0.
+\]
+\end{lemma}
+
+\begin{proof}
+Let \(\lambda_1,\ldots,\lambda_d\) denote the eigenvalues of \(C|_{S_d}\). The upper spectral bound gives \(\lambda_j\leqslant\overline\lambda\) for every \(j\), and therefore
+\(
+\det_{S_d}(C)
+=
+\prod_{j=1}^d\lambda_j
+\leqslant
+\overline\lambda^d.
+\)
+Consequently, \(\det_{S_d}(C)^{-1/2}\geqslant\overline\lambda^{-d/2}\).
+
+The lower spectral bound gives
+\(
+(C|_{S_d})^{-1}
+\preceq
+\underline\lambda^{-1}I_{S_d}.
+\)
+Hence, for \(y\in B_{S_d}(0,R_0)\),
+\[
+\begin{aligned}
+\left\langle
+(C|_{S_d})^{-1}(y-m),y-m
+\right\rangle_H
+&\leqslant
+\underline\lambda^{-1}\|y-m\|_H^2\\
+&\leqslant
+\underline\lambda^{-1}
+\bigl(\|y\|_H+\|m\|_H\bigr)^2\\
+&\leqslant
+\underline\lambda^{-1}(R_0+M)^2.
+\end{aligned}
+\]
+Substituting the determinant and quadratic-form estimates into the density formula of Proposition~\ref{prop:Gaussian density on the approximation space} gives the stated lower bound.
+\end{proof}
+
+
+\subsection{Finite-rank Gaussian covariance construction}\label{subsec:Finite-rank Gaussian covariance construction}
+
+We now introduce the finite-rank Gaussian covariance construction that will later be used in constructing the functional autoregressive transformer in Section \ref{subsec:Functional autoregressive transformer}.
+
+\begin{definition}[Finite-rank operator]
+A bounded linear operator \(C:H\to H\) is called \emph{finite rank} if it can be written as a finite sum of rank-one operators. In other words \(C\) is finite rank if we can write \(C=\sum_{k=1}^r u_k\otimes v_k\), for some \(u_1,\ldots,u_r,v_1,\ldots,v_r\in H\).
+\end{definition}
+
+Given functions \(c_1,\ldots,c_r\in H\), we define the operator \(C=\sum_{k=1}^r c_k\otimes c_k\). This construction is motivated by the need to parameterise covariance operators in a way that is both mathematically valid and computationally tractable. In infinite-dimensional spaces, a covariance operator must be in \(\mathcal L_1^+\). Rather than asking a model to output an arbitrary bounded operator and then imposing these constraints afterwards, we construct the covariance operator directly from a finite collection of functions.
+
+The functions \(c_1,\ldots,c_r\) represent directions of variability in the random function. The resulting operator assigns variance only in the finite-dimensional subspace spanned by these directions. The following proposition verifies that this finite-rank construction automatically produces an admissible covariance operator.
+
+\begin{proposition}[Finite-rank covariance]\label{prop:Finite-rank covariance}
+Let \(c_1,\ldots,c_r\in H\), and define the finite-rank covariance by \(C=\sum_{k=1}^r c_k\otimes c_k\). Then \(C\in\mathcal L_1^+(H)\).
+\end{proposition}
+
+\begin{proof}
+First, \(C\) is self-adjoint. For \(h,k\in H\), \(\langle Ch,k\rangle_H
+=
+\sum_{j=1}^r\langle h,c_j\rangle_H\langle c_j,k\rangle_H
+=
+\langle h,Ck\rangle_H\). Second, \(C\) is non-negative. For every \(h\in H\), \(\langle Ch,h\rangle_H=\sum_{j=1}^r|\langle h,c_j\rangle_H|^2\geqslant0\). Finally, \(C\) has finite rank because \(\operatorname{Ran}(C)\subseteq\operatorname{span}\{c_1,\ldots,c_r\}\). Every finite-rank operator is trace class. Therefore, \(C\in\mathcal L_1^+(H)\).
+\end{proof}
+
+Since this finite-rank covariance operator is admissible, we now introduce a factorisation that will be useful for sampling and for the later functional autoregressive transformer.
+
+\begin{definition}[Covariance factor]
+Let \(c_1,\ldots,c_r\in H\). We call a \emph{covariance factor} an operator \(B:\mathbb R^r\to H\) such that \(Ba=\sum_{k=1}^r a_kc_k\), where \(a=(a_1,\ldots,a_r)\in\mathbb R^r\).
+\end{definition}
+
+The operator \(B\) maps a vector of coefficients in \(\mathbb R^r\) to the corresponding linear combination of the functions \(c_1,\ldots,c_r\).
+
+\begin{lemma}[Adjoint of the covariance factor]
+Let \(B\) be a covariance factor. Then its adjoint is the operator \(B^*:H\to\mathbb R^r\) given by \(B^*h=\bigl(\langle h,c_1\rangle_H,\ldots,\langle h,c_r\rangle_H\bigr)\).
+\end{lemma}
+
+\begin{proof}
+Let \(a=(a_1,\ldots,a_r)\in\mathbb R^r\) and \(h\in H\). Then
+\[
+\langle Ba,h\rangle_H=\left\langle\sum_{k=1}^ra_kc_k,h\right\rangle_H=\sum_{k=1}^ra_k\langle c_k,h\rangle_H=\left\langle a,\bigl(\langle h,c_1\rangle_H,\ldots,\langle h,c_r\rangle_H\bigr)\right\rangle_{\mathbb R^r}.
+\]
+The first equality uses the definition of \(B\), the second uses linearity of the inner product, and the third uses the symmetry of the real Hilbert-space inner product. By the definition of the adjoint, the vector in \(\mathbb R^r\) appearing on the right-hand side is \(B^*h\).
+\end{proof}
+
+\begin{proposition}[Finite-rank covariance factorisation]\label{prop:Finite-rank covariance factorisation}
+Let \(c_1,\ldots,c_r\in H\) and \(B\) be a covariance factor. Then the finite-rank covariance satisfies \(C=BB^*\).
+\end{proposition}
+
+\begin{proof}
+For every \(h\in H\),
+\[
+BB^*h=B\bigl(\langle h,c_1\rangle_H,\ldots,\langle h,c_r\rangle_H\bigr)=\sum_{k=1}^r\langle h,c_k\rangle_Hc_k=\left(\sum_{k=1}^r c_k\otimes c_k\right)h=Ch.
+\]
+The first equality uses the definition of the adjoint \(B^*\), the second uses the definition of \(B\), the third uses the definition of the rank-one operator \(c_k\otimes c_k\), and the final equality uses the definition of \(C\). Since this holds for every \(h\in H\), we conclude that \(C=BB^*\).
+\end{proof}
+
+The following result gives the probabilistic interpretation of this factorisation.
+
+\begin{theorem}[Finite-rank Gaussian construction]\label{thm:Finite-rank Gaussian construction}
+Let \(m\in H\), let \(c_1,\ldots,c_r\in H\), and define as above \(B:\mathbb R^r\to H\) and \(C:H\to H\). Let \(\xi=(\xi_1,\ldots,\xi_r)\sim\mathcal N(0,I_r)\), where \(\xi_1,\ldots,\xi_r\) are independent standard Gaussian random variables. Define the \(H\)-valued random element \(X=m+B\xi\). Then \(X\) is Gaussian with mean \(m\) and covariance operator \(C=BB^*\)
+\end{theorem}
+
+\begin{proof}
+Let \(h\in H\). Since \(X=m+B\xi\), we have
+\(\langle X,h\rangle_H=\langle m,h\rangle_H+\langle B\xi,h\rangle_H\). Using the definition of the adjoint, \(\langle B\xi,h\rangle_H=\langle \xi,B^*h\rangle_{\mathbb R^r}\). Since \(\xi\sim\mathcal N(0,I_r)\), the random variable \(\langle \xi,B^*h\rangle_{\mathbb R^r}\) is a real Gaussian random variable. Therefore, for every \(h\in H\), \(\langle X,h\rangle_H\) is Gaussian, and hence \(X\) is an \(H\)-valued Gaussian random element.
+
+Since \(\mathbb E[\xi]=0\), the mean is easily computed \(\mathbb E[X]=m+\mathbb E[B\xi]=m+B\mathbb E[\xi]=m\). It remains to identify the covariance operator, but first a technical lemma.
+\begin{lemma}\label{lem:Covariance identity for a standard Gaussian vector}
+Let \(\xi\sim\mathcal N(0,I_r)\) and let \(a,b\in\mathbb R^r\). Then \(\mathbb E\bigl[\langle \xi,a\rangle_{\mathbb R^r}\langle \xi,b\rangle_{\mathbb R^r}\bigr]
+=
+\langle a,b\rangle_{\mathbb R^r}
+\).
+\end{lemma}
+
+\begin{proof}
+Writing \(a=(a_1,\ldots,a_r)\), \(b=(b_1,\ldots,b_r)\), and \(\xi=(\xi_1,\ldots,\xi_r)\), we have
+\[
+\mathbb E\bigl[\langle \xi,a\rangle_{\mathbb R^r}\langle \xi,b\rangle_{\mathbb R^r}\bigr]
+=
+\mathbb E\left[\sum_{i=1}^r\sum_{j=1}^r\xi_i\xi_j a_i b_j\right]
+=
+\sum_{i=1}^r\sum_{j=1}^r\mathbb E[\xi_i\xi_j]a_ib_j
+=
+\sum_{i=1}^ra_ib_i
+=
+\langle a,b\rangle_{\mathbb R^r}.
+\]
+The third equality uses that the components of \(\xi\) are independent standard Gaussian random variables, so \(\mathbb E[\xi_i\xi_j]=\delta_{ij}\).
+\end{proof}
+
+Let \(h,k\in H\) and let \(\mathscr C:H \to H\) defined by \(\langle \mathscr Ch,k\rangle = \mathbb E[\langle X-m,h\rangle_H\langle X-m,k\rangle_H]\) be the covariance operator. Then
+\[
+\langle \mathscr Ch,k\rangle =\mathbb E[\langle B\xi,h\rangle_H\langle B\xi,k\rangle_H]=\mathbb E[\langle \xi,B^*h\rangle_{\mathbb R^r}\langle \xi,B^*k\rangle_{\mathbb R^r}]=\langle B^*h,B^*k\rangle_{\mathbb R^r}=\langle BB^*h,k\rangle_H,
+\]
+where the first equality follows from \(X-m=B\xi\), the second equality follows from the definition of the adjoint operator, the third equality uses Lemma \ref{lem:Covariance identity for a standard Gaussian vector} with \(a=B^*h\) and \(b=B^*k\), and the final equality follows from the definition of the adjoint. Hence the covariance operator \(\mathscr C = BB^* = C\), therefore \(X\sim\mathcal N(m,C)\).
+\end{proof}
+
+The finite-rank factorisation has useful consequences, such as \(C\) being \(\mathcal L_1^+(H)\), and \(\operatorname{tr}(C)=\sum_{k=1}^r\|c_k\|_H^2\). Furthermore, this construction will be used later to parameterise the covariance output of the functional autoregressive transformer. Rather than learning an arbitrary operator on \(H\), the model learns a finite collection of functions \(c_1,\ldots,c_r\). These functions determine both the covariance operator and the random perturbation used to generate the next function.
+
+
+\subsection{General state-space Markov chains}\label{subsec:General state-space Markov chains}
+
+We recall the general state-space framework for Markov chains, following Meyn and Tweedie \cite{MeynTweedie2009}. In this thesis, the state space will be the product Hilbert space \(E=H^n\), where \(H\) is a separable Hilbert space. We equip \(E\) with its Borel \(\sigma\)-algebra \(\mathcal B(E)\).
+The starting point for the construction of a Markov chain on \(E\) is a collection of one-step transition probabilities.
+
+\begin{definition}[Markov transition kernel]\label{def:Markov transition kernel}
+Let \(E\) be a measurable state space equipped with its Borel \(\sigma\)-algebra \(\mathcal B(E)\). A map \(P:E\times\mathcal B(E)\to[0,1]\) is called a \emph{Markov transition kernel} if: (i) for every fixed \(F\in E\), the map \(A\mapsto P(F,A)\) is a probability measure on \((E,\mathcal B(E))\), and (ii) for every fixed \(A\in\mathcal B(E)\), the map \(F\mapsto P(F,A)\) is Borel measurable.
+\end{definition}
+For a fixed state \(F\in E\), the probability measure \(P(F,\cdot)\) describes the distribution of the state after one transition from \(F\). The measurability condition ensures that these transition probabilities depend measurably on the current state.
+
+\begin{example}[Deterministic transition kernel]
+Let \(T:E\to E\) be a Borel measurable map and define \(P(F,A)=\mathbf 1_A(T(F))\). For each \(F\in E\), \(P(F,\cdot)\) is the Dirac probability measure concentrated at \(T(F)\). Moreover, for every \(A\in\mathcal B(E)\), \(F\mapsto P(F,A)=\mathbf 1_A(T(F))\) is Borel measurable. Hence \(P\) is a Markov transition kernel. This example shows that a Markov kernel need not describe a genuinely random transition: deterministic dynamical systems are included as a special case.
+\end{example}
+
+\begin{example}[Gaussian transition kernel]
+Suppose that \(m:E\to H\) and \(C:E\to\mathcal L_1^+(H)\) are suitably measurable. A kernel of the form \(Q(F,\cdot)=\mathcal N(m(F),C(F))\) describes a transition whose next output is a Gaussian random function with context-dependent mean and covariance. The functional autoregressive transformer studied later will produce a kernel of precisely this form.
+\end{example}
+
+The following result, see \cite[Theorem 3.4.1.]{MeynTweedie2009}, shows that a transition probability kernel, together with an initial probability measure, determines a stochastic process.
+
+\begin{theorem}[Existence of the Markov process]\label{thm:Existence of the Markov process}
+Let \(\mu\) be a probability measure on \((E,\mathcal B(E))\), and let \(P\) be a transition probability kernel on \(E\). Then there exists a stochastic process \((F_t)_{t\in\mathbb N_0}\) with state space \(E\) and initial distribution \(\mu\) such that, for every \(t\in\mathbb N_0\) and every \(A_0,\ldots,A_t\in\mathcal B(E)\),
+\begin{equation}\label{eq:Markov process}
+\mathbb P_\mu(F_0\in A_0,\ldots,F_t\in A_t) = \int_{A_0}\mu(\mathrm dx_0) \int_{A_1}P(x_0,\mathrm dx_1) \cdots \int_{A_t}P(x_{t-1},\mathrm dx_t).
+\end{equation}
+\end{theorem}
+
+\begin{definition}[Time-homogeneous Markov chain]
+A stochastic process \((F_t)_{t\in\mathbb N_0}\) taking values in \(E\) is called a \emph{time-homogeneous Markov chain} with transition probability kernel \(P\) and initial distribution \(\mu\) if its finite-dimensional distributions satisfy \eqref{eq:Markov process}, for every \(t\in\mathbb N_0\) and \(A_0,\ldots,A_t\in\mathcal B(E)\).
+
+Equivalently, the process satisfies the Markov property \(\mathbb P_\mu(F_{t+1}\in A\mid F_0,\ldots,F_t)=P(F_t,A)\) almost surely, for every \(t\in\mathbb N_0\) and \(A\in\mathcal B(E)\). Thus, conditionally on the current state, the distribution of the next state is independent of the preceding history.
+\end{definition}
+
+The one-step transition kernel describes only a single update of the context. To study the long-time behaviour of the Markov chain, we also need notation for repeated transitions and for the evolution of an arbitrary initial distribution under the kernel. This leads naturally to iterated kernels and to the notion of an invariant probability measure. These concepts will be used later to formulate convergence of the functional autoregressive transformer inference chain towards equilibrium.
+
+\begin{definition}[Iterated kernels and action on measures]\label{def:Iterated kernels and action on measures}
+For a Markov kernel \(P\), we define the initial kernel \(P^0(F,A)=\mathbf 1_A(F)\) and recursively
+\(
+P^{t+1}(F,A)=\int_E P^t(G,A)P(F,\mathrm dG).
+\)
+For \(\mu\in\mathcal P(E)\), the measure \(\mu P\) is defined by \((\mu P)(A)=\int_E P(F,A)\mu(\mathrm dF)\). A probability measure \(\pi\) is \emph{invariant} if \(\pi P=\pi\).
+\end{definition}
+
+To quantify convergence of these evolving probability measures, we require a metric on probability distributions. Total variation measures the largest difference that two probability measures assign to the same measurable event.
+
+\begin{definition}[Total variation distance]\label{def:Total variation distance}
+For \(\mu,\nu\in\mathcal P(E)\),
+\(
+d_{\mathrm{TV}}(\mu,\nu)=\sup_{A\in\mathcal B(E)}|\mu(A)-\nu(A)|.
+\)
+Note that \(0\leqslant d_{\mathrm{TV}}(\mu,\nu)\leqslant1\).
+\end{definition}
+
+\subsection{Drift, small sets, and geometric ergodicity}\label{subsec:Drift small sets and geometric ergodicity}
+
+Having introduced invariant measures and total variation distance, we now turn to conditions that can be used to establish convergence towards equilibrium. In a general state space, the existence of an invariant probability measure and convergence to it do not follow automatically from the definition of a Markov kernel. Additional structure is required to control both the behaviour of the chain far from equilibrium and its ability to mix once it enters a suitable region of the state space.
+
+Two standard mechanisms are particularly useful for this purpose. A \emph{Lyapunov drift condition} controls the growth of the chain by showing that, on average, a suitable non-negative function decreases outside a bounded region. A \emph{minorisation condition} provides a common probabilistic component in the transition laws and therefore quantifies the ability of the chain to forget its current state. Together, drift and minorisation form a classical route to geometric ergodicity for general-state-space Markov chains; see, for example, \cite{MeynTweedie2009}.
+
+For the functional autoregressive transformer considered later, these two mechanisms arise naturally from the architecture. The deterministic shift of the context window, together with a uniform bound on the second moment of the newly generated function, will yield a geometric drift inequality. The fixed approximation space and the nondegenerate Gaussian covariance floor will provide a common lower bound for the conditional output densities, which will in turn lead to a multistep minorisation of the context kernel. We therefore introduce the corresponding notions below.
+
+\begin{definition}[Lyapunov function and drift]\label{def:Lyapunov function and drift}
+Any measurable map \(V:E\to[1,\infty)\) is called a \emph{Lyapunov function} and we write
+\(
+PV(F)=\int_EV(G)P(F,\mathrm dG).
+\)
+A geometric Foster--Lyapunov drift condition is an inequality of the form
+\(
+PV\leqslant\lambda V+b\mathbf 1_C
+\)
+for some \(\lambda\in(0,1)\), \(b<\infty\), and measurable set \(C\).
+\end{definition}
+
+\begin{definition}[Small set and minorisation]\label{def:Small set and minorisation}
+A measurable set \(C\subseteq E\) is called \((m,\varepsilon,\nu)\)-small if there exist \(m\in\mathbb N\), \(\varepsilon>0\), and \(\nu\in\mathcal P(E)\) such that
+\(
+P^m(F,A)\geqslant\varepsilon\nu(A)
+\)
+for every \(F\in C\) and \(A\in\mathcal B(E)\). If \(C=E\), this is a global \(m\)-step Doeblin condition.
+\end{definition}
+
+\begin{definition}[Uniform geometric ergodicity]\label{def:Uniform geometric ergodicity}
+A Markov kernel \(P\) is called \emph{uniformly geometrically ergodic in total variation} if it admits an invariant probability measure \(\pi\) and there exist \(M_{\mathrm{TV}}<\infty\) and \(q_{\mathrm{TV}}\in(0,1)\) such that
+\(
+\sup_{F\in E}d_{\mathrm{TV}}\bigl(P^t(F,\cdot),\pi\bigr)\leqslant M_{\mathrm{TV}}q_{\mathrm{TV}}^t,\)
+for all \(t\in\mathbb N_0.
+\)
+\end{definition}
+
+The equivalence between uniform ergodicity and a global smallness condition is discussed in Meyn and Tweedie \cite[Theorem~16.0.2]{MeynTweedie2009}. For the functional autoregressive transformer, we will only require the following elementary consequence of a global Doeblin condition. It shows that whenever every transition law contains the same probabilistic component, the Markov kernel is contractive in total variation.
+
+\begin{lemma}[Doeblin contraction in total variation]\label{lem:Doeblin contraction in total variation}
+Let \(P\) be a Markov kernel on \(E\). Suppose there exist \(\varepsilon\in(0,1]\) and \(\nu\in\mathcal P(E)\) such that \(P(F,A)\geqslant\varepsilon\nu(A)\) for every \(F\in E\) and \(A\in\mathcal B(E)\). Then, for every \(\mu_1,\mu_2\in\mathcal P(E)\), \(d_{\mathrm{TV}}(\mu_1P,\mu_2P)\leqslant(1-\varepsilon)d_{\mathrm{TV}}(\mu_1,\mu_2)\).
+\end{lemma}
+
+\begin{proof}
+If \(\varepsilon=1\), then \(P(F,A)\geqslant\nu(A)\) for every \(A\in\mathcal B(E)\). Since both \(P(F,\cdot)\) and \(\nu\) are probability measures, equality of their total masses implies \(P(F,\cdot)=\nu(\cdot)\) for every \(F\in E\). Hence \(\mu_1P=\mu_2P=\nu\), and the result follows immediately.
+
+Suppose now that \(\varepsilon<1\). Define \(R(F,A)=[P(F,A)-\varepsilon\nu(A)]/(1-\varepsilon)\) for \(F\in E\) and \(A\in\mathcal B(E)\). The minorisation assumption gives \(R(F,A)\geqslant0\), while \(R(F,E)=[P(F,E)-\varepsilon\nu(E)]/(1-\varepsilon)=1\). Moreover, \(F\mapsto R(F,A)\) is measurable for every \(A\in\mathcal B(E)\), so \(R\) is a Markov kernel. Then, by construction \(P(F,\cdot)=\varepsilon\nu(\cdot)+(1-\varepsilon)R(F,\cdot)\).
+
+Therefore, for \(i\in\{1,2\}\), \(\mu_iP=\varepsilon\nu+(1-\varepsilon)\mu_iR\), and hence \(\mu_1P-\mu_2P=(1-\varepsilon)(\mu_1R-\mu_2R)\). It follows that \(d_{\mathrm{TV}}(\mu_1P,\mu_2P)=(1-\varepsilon)d_{\mathrm{TV}}(\mu_1R,\mu_2R)\). Since Markov kernels are non-expansive in total variation, \(d_{\mathrm{TV}}(\mu_1R,\mu_2R)\leqslant d_{\mathrm{TV}}(\mu_1,\mu_2)\). Combining these two inequalities concludes the proof.
+\end{proof}
+
+\begin{remark}
+If \(P\) satisfies a global \(m\)-step Doeblin condition \(P^m(F,A)\geqslant\varepsilon\nu(A)\), then Lemma~\ref{lem:Doeblin contraction in total variation} may be applied to the Markov kernel \(P^m\). Hence \(d_{\mathrm{TV}}(\mu_1P^m,\mu_2P^m)\leqslant(1-\varepsilon)d_{\mathrm{TV}}(\mu_1,\mu_2)\).
+\end{remark}
+
+
+\subsection{Optimal transport}\label{subsec:Optimal transport}
+
+We recall the basic notions of optimal transport, following Villani \cite{Villani2009}, that will be used for Gaussian comparison, the pretraining loss, metric dependence, and regularity estimates for the Gaussian output kernel. Throughout this subsection, let \(H\) be a Polish metric space with metric \(d\).
+
+The central idea of optimal transport is to compare probability measures by considering all possible ways of coupling them. A coupling specifies how samples from one probability measure are paired with samples from another, and the optimal transport problem seeks the pairing with minimal expected cost.
+
+\begin{definition}[Coupling]
+Let \(\mu,\nu\in\mathcal P(H)\). A probability measure \(\gamma\in\mathcal P(H\times H)\) is called a \emph{coupling} of \(\mu\) and \(\nu\) if its first marginal is \(\mu\) and its second marginal is \(\nu\). The set of all couplings of \(\mu\) and \(\nu\) is denoted by \(\Pi(\mu,\nu)\).
+\end{definition}
+
+\begin{example}[Couplings of Dirac measures]
+Let \(y,z\in H\). There is only one coupling of \(\delta_y\) and \(\delta_z\), namely \(\gamma=\delta_{(y,z)}\). Thus, in the special case of point masses, there is no freedom in choosing a coupling: the transport cost is simply the distance between the two points.
+\end{example}
+
+\begin{definition}[Wasserstein spaces]
+For \(p\geqslant1\), the Wasserstein space \(\mathcal P_p(H)\) consists of probability measures whose \(p\)-th moment is finite,
+\[
+\mathcal P_p(H)=\left\{\mu\in\mathcal P(H):\int_H d(h,h_0)^p\,\mu(\mathrm dh)<\infty\right\},
+\]
+where \(h_0\in H\) is arbitrary. This definition does not depend on the choice of \(h_0\).
+\end{definition}
+
+\begin{definition}[Wasserstein distance]
+For \(\mu,\nu\in\mathcal P_p(H)\), the \(p\)-Wasserstein distance is defined by
+\[
+W_p(\mu,\nu)=\left[\inf_{\gamma\in\Pi(\mu,\nu)}\int_{H\times H}d(y,z)^p\,\gamma(\mathrm dy,\mathrm dz)\right]^{1/p}.
+\]
+\end{definition}
+The Wasserstein distance measures the minimal average cost of transporting the probability mass of \(\mu\) into the probability mass of \(\nu\). The coupling \(\gamma\) describes a possible transport plan, and the infimum selects the optimal plan. In this thesis, we will primarily use the case \(p=2\). If \(Y\) and \(Z\) are random elements on a common probability space with laws \(\mu\) and \(\nu\), then their joint distribution is an admissible coupling. Therefore, \(W_2^2(\mu,\nu)\leqslant\mathbb E[d(Y,Z)^2]\). Equality holds whenever the joint distribution of \((Y,Z)\) is an optimal coupling. A particularly useful special case is the Wasserstein distance between a probability measure and a Dirac measure.
+
+\begin{example}\label{ex:Dirac optimal transport}
+For \(h_0\in H\) and \(\mu\in\mathcal P_2(H)\), \(W_2^2(\mu,\delta_{h_0})=\int_H d(h,h_0)^2\,\mu(\mathrm dh)\).
+There is only one possible coupling between \(\mu\) and \(\delta_{h_0}\), namely the measure that pairs every point \(h\) with \(h_0\). Substituting this coupling into the definition of the Wasserstein distance gives the result.
+\end{example}
+
+Next, we give the standard completeness theorem for Wasserstein spaces; see \cite[Theorem~6.18]{Villani2009}.
+
+\begin{theorem}[Completeness of the Wasserstein space]\label{thm:Completeness of the Wasserstein space}
+If \((H,d)\) is complete and separable, then \((\mathcal P_2(H),W_2)\) is also a complete and separable metric space.
+\end{theorem}
+
+From now on, we specialise to the case where the underlying space is a separable Hilbert space and introduce the covariance metric appearing in the Wasserstein distance between Gaussian measures. Let \(H\) be a real separable Hilbert space and let \(C_1,C_2\in\mathcal L_1^+(H)\).
+
+\begin{definition}[Bures--Wasserstein distance]
+The Bures--Wasserstein distance between \(C_1\) and \(C_2\) is defined by
+\[d_{\mathrm{BW}}^2(C_1,C_2)=\operatorname{tr}(C_1)+\operatorname{tr}(C_2)-2\operatorname{tr}((C_2^{1/2}C_1C_2^{1/2})^{1/2}).\]
+\end{definition}
+
+The Bures--Wasserstein distance measures the difference between covariance operators in the geometry induced by optimal transport. It plays the same role for covariance operators that the Euclidean distance between means plays for deterministic points.
+
+\begin{theorem}[Wasserstein distance between Gaussian measures]\label{thm:Wasserstein distance between Gaussian measures}
+Suppose that \(m_1,m_2\in H\) and \(C_1,C_2\in\mathcal L_1^+(H)\). Let \(\mu_1=\mathcal N(m_1,C_1)\) and \(\mu_2=\mathcal N(m_2,C_2)\). Then \(\mu_1,\mu_2\in\mathcal P_2(H)\), and
+\[
+W_2^2(\mu_1,\mu_2)=\|m_1-m_2\|_H^2+d_{\mathrm{BW}}^2(C_1,C_2).
+\]
+\end{theorem}
+
+\begin{proof}
+We separate the contribution of the means from the contribution of the covariance operators. Let \(Y_1\sim\mathcal N(m_1,C_1)\) and \(Y_2\sim\mathcal N(m_2,C_2)\). Define the centred Gaussian random elements \(Z_1=Y_1-m_1\) and \(Z_2=Y_2-m_2\), such that \(Z_1\sim\mathcal N(0,C_1)\) and \(Z_2\sim\mathcal N(0,C_2).\)
+
+Consider any coupling of the centred Gaussian measures. That is, let \((Z_1,Z_2)\) be any pair with the above marginals. Then \((Y_1,Y_2)\) is a coupling of \(\mu_1\) and \(\mu_2\) with transport cost
+\[\mathbb E\lVert Y_1-Y_2\rVert_H^2=\mathbb E\lVert m_1-m_2+Z_1-Z_2\rVert_H^2 = \mathbb E\lVert m_1-m_2\rVert_H^2+\mathbb E\lVert Z_1-Z_2\rVert_H^2+2\mathbb E\langle m_1-m_2,Z_1-Z_2\rangle_H.\]
+The first term is deterministic, and the cross term vanishes as \(\mathbb E[Z_1]=\mathbb E[Z_2]=0\), hence
+\[\mathbb E\lVert Y_1-Y_2\rVert_H^2=\lVert m_1-m_2\rVert_H^2+\mathbb E\lVert Z_1-Z_2\rVert_H^2.\]
+Taking the infimum over all couplings of the centred measures gives
+\[W_2^2(\mu_1,\mu_2)=\lVert m_1-m_2\rVert_H^2+W_2^2(\mathcal N(0,C_1),\mathcal N(0,C_2)).\]
+The Wasserstein distance between centred Gaussian measures on a separable Hilbert space is given by \cite{Gelbrich1990}: \(W_2^2(\mathcal N(0,C_1),\mathcal N(0,C_2))=d_{\mathrm{BW}}^2(C_1,C_2)\), completing the proof.
+\end{proof}
+
+This decomposition is fundamental for the analysis of the functional autoregressive transformer. It separates the difference between two Gaussian output distributions into two contributions: the difference between their predicted means and the difference between their predicted covariance operators.
+
+For the finite-rank covariance parameterisation used by the functional autoregressive transformer, it is useful to relate the Bures--Wasserstein distance to covariance factors.
+
+\begin{definition}[Hilbert--Schmidt norm]\label{def:Hilbert--Schmidt norm}
+Let \(U,V\) be Hilbert spaces and let \(B:U\to V\) be a bounded linear operator. If \((e_j)_{j\geqslant1}\) is an orthonormal basis of \(U\), the Hilbert--Schmidt norm of \(B\) is defined by \(\|B\|_{\mathrm{HS}}^2=\sum_{j=1}^{\infty}\|Be_j\|_V^2\), whenever this quantity is finite.
+\end{definition}
+
+\begin{proposition}[Coupling bound for covariance factors]\label{prop:Coupling bound for covariance factors}
+Let \(B_1,B_2:\mathbb R^r\to H\) be bounded linear operators and define \(C_1=B_1B_1^*\) and \(C_2=B_2B_2^*\). Then \(d_{\mathrm{BW}}^2(C_1,C_2)\leqslant\|B_1-B_2\|_{\mathrm{HS}}^2\).
+\end{proposition}
+
+\begin{proof}
+The idea is to construct an explicit coupling between the two Gaussian measures using the same Gaussian noise. Let \(\xi\sim\mathcal N(0,I_r)\), where \(\xi\) is a standard Gaussian vector in \(\mathbb R^r\), and define \(Y_1=B_1\xi\) and \(Y_2=B_2\xi\).
+
+Since \(B_1:\mathbb R^r\to H\) is linear, \(Y_1\) is Gaussian with mean \(\mathbb E[Y_1]=\mathbb E[B_1\xi]=B_1\mathbb E[\xi]=0\) and covariance \(\mathbb E[(B_1\xi)\otimes(B_1\xi)] = B_1\,\mathbb E[\xi\otimes\xi]\,B_1^* =B_1I_rB_1^* = B_1B_1^* = C_1 \).
+Hence \(Y_1\sim\mathcal N(0,C_1)\) and similarly \(Y_2\sim\mathcal N(0,C_2)\). It remains now to compute:
+\[
+\begin{aligned}
+d_{\mathrm{BW}}^2(C_1,C_2) &=W_2^2\!\left(\mathcal N(0,C_1),\mathcal N(0,C_2)\right) \\
+&\leqslant\mathbb E\lVert Y_1-Y_2\rVert_H^2 \\
+&=
+\mathbb E\lVert(B_1-B_2)\xi\rVert_H^2 \\
+&=
+\mathbb E\left\langle
+\xi,(B_1-B_2)^*(B_1-B_2)\xi
+\right\rangle_{\mathbb R^r}\\
+&=
+\operatorname{tr}\left(
+(B_1-B_2)^*(B_1-B_2)\mathbb E[\xi\xi^\top]
+\right)\\
+&=
+\operatorname{tr}\left(
+(B_1-B_2)^*(B_1-B_2)
+\right)\\
+&=
+\lVert B_1-B_2\rVert_{\mathrm{HS}}^2,
+\end{aligned}
+\]
+where the first equality follows from the Gaussian Wasserstein formula for centred Gaussian measures, the second inequality follows from the definition of the Wasserstein distance since the joint law of \((Y_1,Y_2)\) is an admissible coupling, the third equality uses \(Y_1=B_1\xi\) and \(Y_2=B_2\xi\), the fourth equality follows from the identity \(\|A\xi\|_H^2=\langle \xi,A^*A\xi\rangle_{\mathbb R^r}\) with \(A=B_1-B_2\), the fifth equality uses \(\mathbb E\langle \xi,M\xi\rangle=\operatorname{tr}(M\mathbb E[\xi\xi^\top])\), the sixth equality follows from \(\mathbb E[\xi\xi^\top]=I_r\) since \(\xi\sim\mathcal N(0,I_r)\), and the final equality is the definition of the Hilbert--Schmidt norm.
+\end{proof}
+
+This inequality controls the Wasserstein stability of Gaussian output distributions directly through covariance factors. It is used in the Lipschitz analysis of the pretraining loss and in Appendix~\ref{app:Lipschitz regularity}.
+
+
+\subsection{Functional autoregressive transformer}
+\label{subsec:Functional autoregressive transformer}
+
+We now introduce the functional autoregressive transformer studied throughout the thesis. The model combines the finite-context autoregressive structure of transformer-based sequence models with a function-space architecture inspired by neural operators and continuum attention \cite{VaswaniEtAl2017,KovachkiEtAl2023,CalvelloEtAl2025}. In contrast to a standard autoregressive language model, whose observations are tokens in a finite vocabulary, the observations considered here are functions in a Hilbert space. Functional autoregressive modelling is closely related to the classical theory of functional time series, where the evolution of function-valued observations is described through dependence on preceding functions \cite{Bosq2000,HormannKokoszka2010,AueEtAl2015}.
+
+For the concrete architecture considered in this thesis, we now specify the underlying Hilbert space. Let \(d_x,d_f\in\mathbb N\), where \(d_x\) denotes the spatial dimension of the domain and \(d_f\) denotes the number of channels of each function-valued observation. Let \(U\subset\mathbb R^{d_x}\) be a non-empty bounded open set, and specialise to
+\(
+H=L^2(U;\mathbb R^{d_f}).
+\) Clearly, \(H\) is a real separable Hilbert space.
+We fix a context length \(n\in\mathbb N\) and define the context space
+\(
+E=H^n.
+\) At time \(t\), the model receives the functional context
+\(
+F_t=(f_t,\ldots,f_{t+n-1})\in E.
+\)
+Given \(F_t\), the transformer determines a conditional probability distribution \(Q_\Theta(F_t,\cdot)\) for the next function \(f_{t+n}\). A function is sampled from this distribution and appended to the context, after which the oldest function is removed. The procedure is then repeated recursively. This is the direct function-space analogue of finite-context autoregressive generation \cite{BrownEtAl2020,ZekriEtAl2025}.
+
+The main difficulty is therefore to construct \(Q_\Theta(F,\cdot)\) in a way that is both expressive and mathematically well defined on function space. We use the fixed approximation space \(S_d\) introduced in Section~\ref{subsec:Finite-dimensional approximation spaces} and define the conditional output as a Gaussian measure whose mean and covariance are parameterised through coefficient vectors in \(\mathbb R^d\), which are synthesised in \(S_d\). The transformer architecture described below maps the functional context \(F\) to these coefficients.
+
+\paragraph{Functional embeddings and bounded projection.}
+
+As in a standard transformer, the input functions are first embedded into a latent representation. Let \(d_{\mathrm{model}}\in\mathbb N\) denote the latent channel dimension and define the latent Hilbert space \(\mathcal H=L^2(U;\mathbb R^{d_{\mathrm{model}}})\). Each function-valued observation \(f_j\in H\) is lifted to a vector-valued latent function through a bounded linear operator \(\mathsf T_{\mathrm{in}}:H\to\mathcal H\).
+
+To distinguish the position of each function within the context window, we introduce fixed positional embeddings \(p_0,\ldots,p_{n-1}\in\mathcal H\). The \(j\)-th function is first lifted and combined with its positional embedding according to \(\widetilde v_j^{(0)}=\mathsf T_{\mathrm{in}}f_j+p_j\).
+The attention mechanism introduced later involves bilinear interactions between query and key functions. To keep the latent representations uniformly bounded throughout the transformer, we project the functional tokens onto a fixed closed ball in \(\mathcal H\).
+
+For \(R>0\), define the metric projection \(\Pi_R:\mathcal H\to\mathcal H\) onto the closed ball of radius \(R\) by
+\[
+\Pi_R(v)=
+\begin{cases}
+v, & \text{if } \|v\|_{\mathcal H}\leqslant R,\\[4pt]
+{Rv/}{\|v\|_{\mathcal H}}, & \text{if } \|v\|_{\mathcal H}>R.
+\end{cases}
+\]
+The initial latent token is defined by \(v_j^{(0)}=\Pi_R(\widetilde v_j^{(0)})\). Consequently, \(\|v_j^{(0)}\|_{\mathcal H}\leqslant R\) for every context position \(j\).
+The embedded functional context is therefore \(V^{(0)}=(v_0^{(0)},\ldots,v_{n-1}^{(0)})\in\mathcal H^n\). This construction is analogous to token and positional embeddings in a conventional transformer, with the important difference that each token representation is itself a function.
+The projection will also be applied after each residual update. We write \(\Pi_R^{(n)}:\mathcal H^n\to\mathcal H^n\) for the corresponding componentwise projection. As a result, every functional token entering an attention layer has norm at most \(R\).
+
+\paragraph{Function-valued self-attention.}
+
+We use a function-valued version of self-attention motivated by the continuum-attention framework of \cite{CalvelloEtAl2025}. The context index remains discrete, while each element of the sequence is itself a function.
+Consider first a single attention head. Let \(d_q,d_v\in\mathbb N\) denote the query-key and value channel dimensions, respectively, and define \(\mathcal H_q=L^2(U;\mathbb R^{d_q})\) and \(\mathcal H_v=L^2(U;\mathbb R^{d_v})\). Let \(\mathsf Q:\mathcal H\to\mathcal H_q\), \(\mathsf K:\mathcal H\to\mathcal H_q\), and \(\mathsf V:\mathcal H\to\mathcal H_v\) be bounded linear operators, referred to as the query, key, and value operators, respectively.
+
+Let \(V^{(\ell)}=(v_0^{(\ell)},\ldots,v_{n-1}^{(\ell)})\in\mathcal H^n\) denote the input to layer \(\ell\). By construction, every token entering the attention mechanism satisfies \(\|v_j^{(\ell)}\|_{\mathcal H}\leqslant R\). For the first layer this follows from the projection applied to the initial embeddings, while for subsequent layers it follows from the projections applied after the residual updates.
+
+The attention score between positions \(i\) and \(j\) is defined by \(a_{ij}^{(\ell)}=\tau^{-1}\langle \mathsf Qv_i^{(\ell)},\mathsf Kv_j^{(\ell)}\rangle_{\mathcal H_q}\), where \(\tau>0\) is a temperature parameter.
+The corresponding attention coefficients are \(\alpha_{ij}^{(\ell)}=\exp(a_{ij}^{(\ell)})/\sum_{k=0}^{n-1}\exp(a_{ik}^{(\ell)})\). For every \(i\), the coefficients satisfy \(\alpha_{ij}^{(\ell)}>0\) and \(\sum_{j=0}^{n-1}\alpha_{ij}^{(\ell)}=1\).
+The attention output associated with position \(i\) is the function
+\[\mathcal A(V^{(\ell)})_i=\sum_{j=0}^{n-1}\alpha_{ij}^{(\ell)}\mathsf Vv_j^{(\ell)}.\]
+Thus, function-valued self-attention forms a weighted combination of transformed functions. The similarity between two functional tokens is measured through the Hilbert-space inner product of their query and key representations.
+
+No causal mask is required when the architecture is used directly for next-function generation, since the model is provided only with functions belonging to the current context and not with the function being predicted. A causal mask could nevertheless be incorporated if several positions were predicted simultaneously during training.
+
+\paragraph{Multi-head functional attention.}
+
+As in finite-dimensional transformer architectures, several attention heads may be used in parallel. Let \(N_h\in\mathbb N\) denote the number of attention heads. For each \(h\in\{1,\ldots,N_h\}\), let \(\mathsf Q_h^{(\ell)}:\mathcal H\to\mathcal H_q\), \(\mathsf K_h^{(\ell)}:\mathcal H\to\mathcal H_q\), and \(\mathsf V_h^{(\ell)}:\mathcal H\to\mathcal H_v\) denote the query, key, and value operators of the \(h\)-th head in layer \(\ell\), and let \(\mathcal A_h^{(\ell)}\) denote the corresponding attention map. Since \(\mathcal A_h^{(\ell)}(V^{(\ell)})_i\in\mathcal H_v=L^2(U;\mathbb R^{d_v})\), the outputs of the \(N_h\) heads may be concatenated along the channel dimension to give an element of \(\mathcal H_{\mathrm{cat}}=L^2(U;\mathbb R^{N_h d_v})\). Let \(\mathsf W_O^{(\ell)}:\mathcal H_{\mathrm{cat}}\to\mathcal H\) be a bounded linear output operator. The multi-head attention output at position \(i\) is then defined by \(\mathcal A_{\mathrm{MHA}}^{(\ell)}(V^{(\ell)})_i=\mathsf W_O^{(\ell)}\operatorname{Concat}\bigl(\mathcal A_1^{(\ell)}(V^{(\ell)})_i,\ldots,\mathcal A_{N_h}^{(\ell)}(V^{(\ell)})_i\bigr)\). Thus \(\mathcal A_{\mathrm{MHA}}^{(\ell)}(V^{(\ell)})_i\in\mathcal H\) for each context position \(i\), and the output of multi-head attention is again an element of \(\mathcal H^n\).
+
+\paragraph{Attention block and residual connection.}
+
+The output of the multi-head attention block is combined with the original representation through a residual connection. We define \(Z^{(\ell)}=\Pi_R^{(n)}(V^{(\ell)}+\eta_\ell\mathcal A_{\mathrm{MHA}}^{(\ell)}(V^{(\ell)}))\), where \(\eta_\ell\geqslant0\) is a residual scaling parameter.
+The projection is applied componentwise and ensures that every functional token in \(Z^{(\ell)}\) has norm at most \(R\). In particular, the hidden representations remain uniformly bounded after the attention update.
+
+\paragraph{Feed-forward functional network.}
+
+The attention block is followed by a feed-forward transformation acting pointwise in the continuous variable. Let \(d_{\mathrm{ff}}\in\mathbb N\) denote the hidden channel dimension of the feed-forward network. For each layer \(\ell\), let \(\mathsf W_1^{(\ell)}:\mathbb R^{d_{\mathrm{model}}}\to\mathbb R^{d_{\mathrm{ff}}}\) and \(\mathsf W_2^{(\ell)}:\mathbb R^{d_{\mathrm{ff}}}\to\mathbb R^{d_{\mathrm{model}}}\) be bounded linear maps, let \(b_1^{(\ell)}\in\mathbb R^{d_{\mathrm{ff}}}\) and \(b_2^{(\ell)}\in\mathbb R^{d_{\mathrm{model}}}\) be bias vectors, and let \(\sigma:\mathbb R\to\mathbb R\) be a Lipschitz nonlinear activation function applied componentwise. For \(z\in\mathcal H\), define the feed-forward functional network by \(\mathcal F_\ell(z)(x)=\mathsf W_2^{(\ell)}\sigma\!\left(\mathsf W_1^{(\ell)}z(x)+b_1^{(\ell)}\right)+b_2^{(\ell)}\). Since \(U\) is bounded and \(\sigma\) is Lipschitz, \(\mathcal F_\ell(z)\in\mathcal H\) whenever \(z\in\mathcal H\).
+
+A second residual connection gives \(V^{(\ell+1)}=\Pi_R^{(n)}(Z^{(\ell)}+\xi_\ell\mathcal F_\ell^{(n)}(Z^{(\ell)}))\), where \(\xi_\ell\geqslant0\) is a residual scaling parameter and \(\mathcal F_\ell^{(n)}:\mathcal H^n\to\mathcal H^n\) denotes the componentwise application of \(\mathcal F_\ell\). The componentwise projection implies that \(\|v_j^{(\ell+1)}\|_{\mathcal H}\leqslant R\) for every context position \(j\). Hence the boundedness of the latent functional tokens is propagated from one transformer layer to the next. Repeating this procedure over \(L\) transformer layers gives the final latent context \(V^{(L)}=(v_0^{(L)},\ldots,v_{n-1}^{(L)})\in\mathcal H^n\).
+
+\paragraph{Parameter constraints.}
+
+The learnable linear operators appearing in the architecture are parameterised so that their operator norms are bounded. In particular, we restrict the model parameters so that \(\|\mathsf T_{\mathrm{in}}\|_{\mathrm{op}}\leqslant B_{\mathrm{in}}\), \(\|\mathsf Q_h^{(\ell)}\|_{\mathrm{op}}\leqslant B_Q^{(\ell,h)}\), and \(\|\mathsf K_h^{(\ell)}\|_{\mathrm{op}}\leqslant B_K^{(\ell,h)}\), and similarly \(\|\mathsf V_h^{(\ell)}\|_{\mathrm{op}}\leqslant B_V^{(\ell,h)}\), \(\|\mathsf W_O^{(\ell)}\|_{\mathrm{op}}\leqslant B_O^{(\ell)}\), and \(\|\mathsf W_i^{(\ell)}\|_{\mathrm{op}}\leqslant B_i^{(\ell)}\) for \(i\in\{1,2\}\). As assumed above, the nonlinear activation functions are Lipschitz. The same type of constraint is imposed on the learnable linear layers appearing in the mean and covariance heads introduced below.
+These restrictions guarantee finite regularity constants and may be enforced through an explicit normalisation or reparameterisation of the learnable operators. The resulting bounds are derived in Appendix~\ref{app:Lipschitz regularity} and are used in the metric-dependence analysis of the pretraining loss.
+
+\paragraph{Next-function representation.}
+
+After \(L\) transformer layers, the functional context is represented by \(V^{(L)}=(v_0^{(L)},\ldots,v_{n-1}^{(L)})\in\mathcal H^n\). Since the model predicts the function following the complete context, we use the latent representation associated with the final context position. Define the readout operator \(\mathsf R_{\mathrm{out}}:\mathcal H^n\to\mathcal H\) by \(\mathsf R_{\mathrm{out}}(v_0,\ldots,v_{n-1})=v_{n-1}\), and set \(h_\Theta(F)=\mathsf R_{\mathrm{out}}(V^{(L)}(F))\).
+The componentwise projections applied throughout the transformer ensure that \(\|h_\Theta(F)\|_{\mathcal H}\leqslant R\) for every \(F\in E\). Thus every output head receives an element of the same bounded subset of the latent function space.
+
+\paragraph{Mean head.}
+
+The conditional mean is parameterised through coefficient vectors in \(\mathbb R^d\), which are synthesised in the fixed approximation space \(S_d\). Let \(\widetilde{\mathsf T}_m:\mathcal H\to\mathbb R^d\) denote the mean coefficient head, which is assumed to be globally Lipschitz. Let \(\mu_0\in\mathbb R^d\) be a context-independent coefficient vector. For \(F\in E\), define \(\mu_\Theta(F)=\mu_0+\widetilde{\mathsf T}_m(h_\Theta(F))\in\mathbb R^d\).
+The conditional mean function is obtained through the synthesis operator, so that \(m_\Theta(F)=\mathsf E_d\mu_\Theta(F)=\sum_{j=1}^d\mu_{j,\Theta}(F)e_j\). Consequently, \(m_\Theta(F)\in S_d\) for every \(F\in E\).
+Because the latent representation is uniformly bounded and the coefficient head is Lipschitz, the family of conditional means is uniformly bounded in \(H\). The corresponding bound is established formally in Section~\ref{subsec:Well-posedness of Markov transition kernels}.
+
+\paragraph{Covariance-factor heads.}
+
+The covariance is parameterised in the same fixed approximation space, similar to the mean head. Fix a covariance-factor rank \(r\in\mathbb N\). For each \(k\in\{1,\ldots,r\}\), let \(\widetilde{\mathsf T}_{C,k}:\mathcal H\to\mathbb R^d\) be a globally Lipschitz coefficient head. Let \(\gamma_{0,k}\in\mathbb R^d\) be a context-independent coefficient vector. Define \(\gamma_{k,\Theta}(F)=\gamma_{0,k}+\widetilde{\mathsf T}_{C,k}(h_\Theta(F))\in\mathbb R^d\), and synthesise the corresponding functional covariance factor by \(c_{k,\Theta}(F)=\mathsf E_d\gamma_{k,\Theta}(F)\in S_d\).
+Let \(G_\Theta(F)=[\gamma_{1,\Theta}(F)\ \cdots\ \gamma_{r,\Theta}(F)]\in\mathbb R^{d\times r}\) denote the matrix whose \(k\)-th column is \(\gamma_{k,\Theta}(F)\). As with the mean head, boundedness of \(h_\Theta(F)\) and Lipschitz continuity of the coefficient heads imply uniform bounds on the covariance factors. The explicit bounds are derived in Section~\ref{subsec:Well-posedness of Markov transition kernels}.
+
+\paragraph{Conditional covariance.}
+
+Fix a constant \(\sigma_0>0\). The conditional covariance operator is defined by \(C_\Theta(F)=\sigma_0^2\Pi_{S_d}+\sum_{k=1}^r c_{k,\Theta}(F)\otimes c_{k,\Theta}(F)\). Equivalently, under the identification of \(S_d\) with \(\mathbb R^d\) induced by the synthesis operator, the covariance is represented by the matrix \(\Sigma_\Theta(F)=\sigma_0^2I_d+G_\Theta(F)G_\Theta(F)^\top\).
+The term \(\sigma_0^2\Pi_{S_d}\) supplies a fixed nondegenerate covariance floor on \(S_d\), while the covariance-factor term introduces a context-dependent and non-diagonal covariance structure. In particular, the covariance factors are not restricted to individual basis directions: correlations between the basis coefficients are represented through \(G_\Theta(F)G_\Theta(F)^\top\).
+The formal verification that \(C_\Theta(F)\) is an admissible covariance operator, together with its uniform lower and upper spectral bounds, is given in Section~\ref{subsec:Well-posedness of Markov transition kernels}.
+
+\paragraph{Gaussian output layer.}
+
+For a context \(F\in E\), the conditional distribution of the next function is defined by \(Q_\Theta(F,\cdot)=\mathcal N(m_\Theta(F),C_\Theta(F))\).
+Both the conditional mean and every stochastic direction belong to the same fixed approximation space \(S_d\). Hence all conditional output distributions are supported on the same subspace of \(H\), independently of the context \(F\). Moreover, the positive covariance floor makes the Gaussian distribution nondegenerate when it is regarded as a probability measure on \(S_d\).
+This common-support structure is important for the subsequent Markov-chain analysis. In particular, all conditional Gaussian laws admit densities with respect to the same \(d\)-dimensional Lebesgue measure on \(S_d\), which will later allow a common minorising measure to be constructed.
+
+\paragraph{Function generation.}
+
+We now use the finite-rank Gaussian construction of Section \ref{subsec:Finite-rank Gaussian covariance construction} to obtain an explicit sampling representation of the conditional output distribution. Let \(\zeta_t=(\zeta_{t,1},\ldots,\zeta_{t,d})\sim\mathcal N(0,I_d)\) and \(\xi_t=(\xi_{t,1},\ldots,\xi_{t,r})\sim\mathcal N(0,I_r)\) be independent standard Gaussian vectors, and assume that they are independent of the current context \(F_t\). Given \(F_t=(f_t,\ldots,f_{t+n-1})\in E\), define the next function by \(f_{t+n}=m_\Theta(F_t)+\sigma_0\mathsf E_d\zeta_t+\sum_{k=1}^r\xi_{t,k}c_{k,\Theta}(F_t)\).
+
+We verify that this random element has conditional distribution \(Q_\Theta(F_t,\cdot)\). Since \(\mathsf E_d\zeta_t=\sum_{j=1}^d\zeta_{t,j}e_j\), the random perturbation can be written as \(\sigma_0\mathsf E_d\zeta_t+\sum_{k=1}^r\xi_{t,k}c_{k,\Theta}(F_t)=\sum_{j=1}^d\zeta_{t,j}(\sigma_0e_j)+\sum_{k=1}^r\xi_{t,k}c_{k,\Theta}(F_t)\). Therefore, conditionally on \(F_t\), the generated function \(f_{t+n}\) can be written in the form considered in Theorem \ref{thm:Finite-rank Gaussian construction}, with the \(d+r\) covariance factors \(\sigma_0e_1,\ldots,\sigma_0e_d,c_{1,\Theta}(F_t),\ldots,c_{r,\Theta}(F_t)\).
+
+Now let us observe that, since \(\zeta_t\) and \(\xi_t\) are independent standard Gaussian vectors, their concatenation \(\eta_t=(\zeta_{t,1},\ldots,\zeta_{t,d},\xi_{t,1},\ldots,\xi_{t,r})\) is a standard Gaussian vector in \(\mathbb R^{d+r}\). Hence, by Theorem \ref{thm:Finite-rank Gaussian construction}, conditionally on \(F_t\), the random element \(f_{t+n}\) is Gaussian with mean \(m_\Theta(F_t)\) and covariance operator \(\sum_{j=1}^d(\sigma_0e_j)\otimes(\sigma_0e_j)+\sum_{k=1}^rc_{k,\Theta}(F_t)\otimes c_{k,\Theta}(F_t)\).
+
+Lastly, using the bilinearity of the rank-one operator, we have \((\sigma_0e_j)\otimes(\sigma_0e_j)=\sigma_0^2(e_j\otimes e_j)\), and therefore \(\sum_{j=1}^d(\sigma_0e_j)\otimes(\sigma_0e_j)=\sigma_0^2\sum_{j=1}^de_j\otimes e_j\). By the definition of the orthogonal projection onto \(S_d\), \(\Pi_{S_d}=\sum_{j=1}^de_j\otimes e_j\). Consequently, the covariance operator of \(f_{t+n}\), conditionally on \(F_t\), is \(\sigma_0^2\Pi_{S_d}+\sum_{k=1}^rc_{k,\Theta}(F_t)\otimes c_{k,\Theta}(F_t)=C_\Theta(F_t)\).
+It follows that \(f_{t+n}\mid F_t\sim\mathcal N(m_\Theta(F_t),C_\Theta(F_t))=Q_\Theta(F_t,\cdot)\).
+
+\paragraph{Context update and recursive generation.}
+
+After generating \(f_{t+n}\), the context window is shifted by removing its oldest entry and appending the newly generated function, giving \(F_{t+1}=(f_{t+1},\ldots,f_{t+n})\).
+The updated context is then passed through the same transformer and output heads, and the procedure is repeated recursively. Thus the parameters \(\Theta\) determine a conditional Gaussian distribution for every functional context and, together with the shift-and-append update, specify the complete inference mechanism of the functional autoregressive transformer. The probabilistic properties required for well-posedness and the subsequent Markov-chain analysis are established separately in Section~\ref{sec:General state-space Markov chain framework for functional autoregressive transformers}.

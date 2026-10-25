@@ -1,0 +1,764 @@
+\section{Lipschitz regularity of the functional autoregressive transformer}
+\label{app:Lipschitz regularity}
+
+This appendix derives finite global Lipschitz constants for the function-space transformer, its coefficient heads, and the resulting Gaussian output kernel. These estimates formalise the regularity supplied by the bounded projections, finite operator-norm bounds, and Lipschitz nonlinearities in the architecture. In particular, they provide the model constant used in the metric-dependence analysis of the pretraining loss.
+Throughout the appendix, the context space is equipped with the weighted norm from Definition~\ref{def:Weighted context norm}.
+
+\paragraph{Wasserstein stability of the Gaussian output.}
+
+We first control the Wasserstein distance between the Gaussian output laws associated with two contexts. The covariance floor is independent of the context, so it cancels when the corresponding covariance factors are compared.
+
+\begin{lemma}[]\label{lem:Hilbert--Schmidt distance between covariance factors}
+Let \(c_1,\ldots,c_r,\widetilde c_1,\ldots,\widetilde c_r\in H\), and define \(B_1,B_2:\mathbb R^r\to H\) by \(B_1a=\sum_{k=1}^r a_kc_k\) and \(B_2a=\sum_{k=1}^r a_k\widetilde c_k\). Then \(\|B_1-B_2\|_{\mathrm{HS}}^2=\sum_{k=1}^r\|c_k-\widetilde c_k\|_H^2\).
+\end{lemma}
+
+\begin{proof}
+Let \(e_1,\ldots,e_r\) denote the standard orthonormal basis of \(\mathbb R^r\). Then, we compute
+\[
+\|B_1-B_2\|_{\mathrm{HS}}^2 = \sum_{k=1}^r\|(B_1-B_2)e_k\|_H^2 =\sum_{k=1}^r\|c_k-\widetilde c_k\|_H^2,
+\]
+where the first equality uses Definition \ref{def:Hilbert--Schmidt norm} and the second equality follows because \(B_1e_k=c_k\) and \(B_2e_k=\widetilde c_k\).
+\end{proof}
+
+\begin{proposition}[Wasserstein stability of the Gaussian output]\label{prop:Wasserstein stability of the Gaussian output}
+For every \(F,G\in E\),
+\[
+W_2^2\bigl(Q_\Theta(F,\cdot),Q_\Theta(G,\cdot)\bigr)
+\leqslant
+\|m_\Theta(F)-m_\Theta(G)\|_H^2
++
+\sum_{k=1}^r\|c_{k,\Theta}(F)-c_{k,\Theta}(G)\|_H^2.
+\]
+\end{proposition}
+
+\begin{proof}
+We start by defining an augmented covariance factor \(\overline B_\Theta(F):\mathbb R^{d+r}\to H\) by
+\(
+\overline B_\Theta(F)(z,a)
+=\sigma_0\mathsf E_dz+\sum_{k=1}^ra_kc_{k,\Theta}(F).
+\)
+Then
+\(
+C_\Theta(F)=\overline B_\Theta(F)\overline B_\Theta(F)^*.
+\)
+The first \(d\) columns of \(\overline B_\Theta(F)\) are the context-independent functions \(\sigma_0e_1,\ldots,\sigma_0e_d\). Therefore they cancel when two factors are subtracted, and
+\(
+\|\overline B_\Theta(F)-\overline B_\Theta(G)\|_{\mathrm{HS}}^2
+=\sum_{k=1}^r\|c_{k,\Theta}(F)-c_{k,\Theta}(G)\|_H^2.
+\)
+The Gaussian Wasserstein formula and Proposition~\ref{prop:Coupling bound for covariance factors} now give
+\[
+\begin{aligned}
+W_2^2\bigl(Q_\Theta(F,\cdot),Q_\Theta(G,\cdot)\bigr)
+&=\|m_\Theta(F)-m_\Theta(G)\|_H^2
++d_{\mathrm{BW}}^2\bigl(C_\Theta(F),C_\Theta(G)\bigr)\\
+&\leqslant\|m_\Theta(F)-m_\Theta(G)\|_H^2
++\|\overline B_\Theta(F)-\overline B_\Theta(G)\|_{\mathrm{HS}}^2,
+\end{aligned}
+\]
+which is the required estimate.
+\end{proof}
+
+
+
+This estimate reduces the Wasserstein stability of the Gaussian output distribution to the stability of the mean and covariance-factor maps produced by the transformer.
+
+\paragraph{Architectural Lipschitz bound.}
+
+We now derive a global Lipschitz bound for the mean and covariance-factor maps from the constraints built into the functional transformer architecture; see Section~\ref{subsec:Functional autoregressive transformer}. The argument proceeds in stages. We first show that the bounded projection used throughout the architecture is non-expansive. We then control the nonlinear attention mechanism by combining the boundedness of the latent tokens with the Lipschitz continuity of softmax, first for a single attention head and then for multi-head attention. Next, we establish a Lipschitz bound for the feed-forward block. These estimates are then propagated through the residual connections, projections, and successive transformer layers to obtain a global Lipschitz constant for the final latent representation. Finally, we pass this bound through the mean and covariance-factor heads to obtain explicit Lipschitz constants for the Gaussian parameters.
+
+Recall that the main role of the bounded projection is to ensure that every token entering an attention layer belongs to a fixed ball in the latent Hilbert space \(\mathcal H=L^2(U;\mathbb R^{d_{\mathrm{model}}})\). This uniform boundedness is particularly important for the attention mechanism because the query--key scores are bilinear in the latent tokens.
+
+Let \(\mathcal H^n\) be the product space equipped with the product norm \(\|V\|_{\mathcal H^n}^2=\sum_{j=0}^{n-1}\|v_j\|_{\mathcal H}^2\), where \(V=(v_0,\ldots,v_{n-1})\). Define \(\mathcal B_R=\{V=(v_0,\ldots,v_{n-1})\in\mathcal H^n:\|v_j\|_{\mathcal H}\leqslant R \text{ for all }j\}\). By construction of the functional transformer, \(V^{(\ell)}\in\mathcal B_R\) for every transformer layer \(\ell\).
+
+\begin{lemma}[Non-expansiveness of the bounded projection]
+\label{lem:Non-expansiveness of the bounded projection}
+For every \(u,v\in\mathcal H\), the projection \(\Pi_R:\mathcal H\to\mathcal H\) satisfies \(\|\Pi_R(u)-\Pi_R(v)\|_{\mathcal H}\leqslant\|u-v\|_{\mathcal H}\). Consequently, the componentwise projection \(\Pi_R^{(n)}:\mathcal H^n\to\mathcal H^n\) is also non-expansive.
+\end{lemma}
+
+\begin{proof}
+Clearly, the closed ball \(\{w\in\mathcal H:\|w\|_{\mathcal H}\leqslant R\}\) is nonempty, closed and convex. By the characterization of metric projections onto closed convex subsets of Hilbert spaces in Brezis \cite[Theorem~5.2]{Brezis2011}, if \(x=\Pi_R(u)\) and \(y=\Pi_R(v)\), then \(\langle u-x,y-x\rangle_{\mathcal H}\leqslant0\) and \(\langle v-y,x-y\rangle_{\mathcal H}\leqslant0\).
+
+Rearranging these inequalities gives \(\langle u-x,x-y\rangle_{\mathcal H}\geq0\) and \(\langle v-y,x-y\rangle_{\mathcal H}\leqslant0\). Subtracting the second inequality from the first yields \(\|x-y\|_{\mathcal H}^2\leqslant\langle u-v,x-y\rangle_{\mathcal H}\).
+
+By the Cauchy--Schwarz inequality, \(\|x-y\|_{\mathcal H}^2\leqslant\|u-v\|_{\mathcal H}\|x-y\|_{\mathcal H}\). If \(x=y\), the result is immediate. Otherwise, dividing by \(\|x-y\|_{\mathcal H}\) gives \(\|\Pi_R(u)-\Pi_R(v)\|_{\mathcal H}\leqslant\|u-v\|_{\mathcal H}\).
+
+For \(U=(u_0,\ldots,u_{n-1})\) and \(V=(v_0,\ldots,v_{n-1})\), applying this inequality componentwise gives \(\|\Pi_R^{(n)}(U)-\Pi_R^{(n)}(V)\|_{\mathcal H^n}^2\leqslant\sum_{j=0}^{n-1}\|u_j-v_j\|_{\mathcal H}^2=\|U-V\|_{\mathcal H^n}^2\). Hence \(\Pi_R^{(n)}\) is also non-expansive.
+\end{proof}
+
+The preceding lemma shows that the projections used throughout the architecture do not amplify perturbations between latent representations. Their role is therefore particularly convenient: they keep all tokens inside the bounded set \(\mathcal B_R\), while contributing no additional factor to the Lipschitz constants derived below.
+
+The next source of nonlinearity is the attention mechanism. There are two components to control. First, the attention scores depend bilinearly on the query and key functions. Their inputs are uniformly bounded because they belong to \(\mathcal B_R\). Second, the scores are transformed into attention weights through the softmax map. We therefore begin by recalling the Lipschitz continuity of softmax.
+
+\begin{lemma}[Lipschitz continuity of softmax]
+\label{lem:Lipschitz continuity of softmax}
+Let \(\operatorname{softmax}:\mathbb R^n\to\mathbb R^n\) be defined by \(\operatorname{softmax}(a)_j=\exp(a_j)/\sum_{k=0}^{n-1}\exp(a_k)\), for \(j\in\{0,\ldots,n-1\}\). We equip \(\mathbb R^n\) with the Euclidean norm \(\|a\|_2^2=\sum_{j=1}^n|a_j|^2\). Then, for every \(a,b\in\mathbb R^n\), \(\|\operatorname{softmax}(a)-\operatorname{softmax}(b)\|_2\leqslant\frac12\|a-b\|_2\).
+\end{lemma}
+
+\begin{proof}
+This is the \(p=2\) case of the global Lipschitz bound for the softmax operator established in \cite[Theorem~1]{Nair2026}. In particular, the Jacobian of the softmax map is \(J_{\operatorname{softmax}}(a)=\operatorname{Diag}(p)-pp^\top\), where \(p=\operatorname{softmax}(a)\), and its induced Euclidean operator norm is bounded above by \(1/2\). Hence the softmax map is globally \(1/2\)-Lipschitz with respect to \(\|\cdot\|_2\).
+\end{proof}
+
+We can now combine the boundedness of the functional tokens, the operator-norm constraints on the query, key, and value operators, and the Lipschitz continuity of softmax to control a complete attention head. The main point is that a perturbation of the input affects the attention output in two ways: it changes the attention weights through the query--key scores, and it changes the value functions being averaged. The following lemma controls these two effects separately.
+
+\begin{lemma}[Lipschitz continuity of a functional attention head]
+\label{lem:functional-attention-Lipschitz}
+Consider one attention head in layer \(\ell\), with operators satisfying \(\|\mathsf Q_h^{(\ell)}\|_{\mathrm{op}}\leqslant B_Q^{(\ell,h)}\), \(\|\mathsf K_h^{(\ell)}\|_{\mathrm{op}}\leqslant B_K^{(\ell,h)}\), and \(\|\mathsf V_h^{(\ell)}\|_{\mathrm{op}}\leqslant B_V^{(\ell,h)}\). Then, the corresponding attention operator is Lipschitz: for any \(U,V \in \mathcal B_R\), \(\|\mathcal A_h^{(\ell)}(U)-\mathcal A_h^{(\ell)}(V)\|_{\mathcal H_v^n}\leqslant L_{\mathrm{att}}^{(\ell,h)}\|U-V\|_{\mathcal H^n}\), where \(L_{\mathrm{att}}^{(\ell,h)}=\sqrt n\,B_V^{(\ell,h)}\left[1+{B_Q^{(\ell,h)}B_K^{(\ell,h)}R^2\sqrt n(\sqrt n+1)}/{(2\tau)}\right]\).
+\end{lemma}
+
+\begin{proof}
+Let \(U=(u_0,\ldots,u_{n-1})\in\mathcal B_R\) and \(V=(v_0,\ldots,v_{n-1})\in\mathcal B_R\). We first bound the change in the attention weights and then we compute the bound of the resulting attention output.
+
+\textit{Step 1: Bound for the attention scores.}
+Fix a query position \(i\). Then, for the \(j\)-th attention score,
+\[
+\begin{aligned}
+|a_{ij}(U)-a_{ij}(V)|
+&=
+\frac{1}{\tau}
+\left|
+\left\langle \mathsf Q_h^{(\ell)}u_i,\mathsf K_h^{(\ell)}u_j\right\rangle_{\mathcal H_q}
+-
+\left\langle \mathsf Q_h^{(\ell)}v_i,\mathsf K_h^{(\ell)}v_j\right\rangle_{\mathcal H_q}
+\right|\\
+&\leqslant
+\frac{1}{\tau}
+\left|
+\left\langle
+\mathsf Q_h^{(\ell)}(u_i-v_i),
+\mathsf K_h^{(\ell)}u_j
+\right\rangle_{\mathcal H_q}
+\right|
++
+\frac{1}{\tau}
+\left|
+\left\langle
+\mathsf Q_h^{(\ell)}v_i,
+\mathsf K_h^{(\ell)}(u_j-v_j)
+\right\rangle_{\mathcal H_q}
+\right|\\
+&\leqslant
+\frac{1}{\tau}
+\|\mathsf Q_h^{(\ell)}\|_{\mathrm{op}}
+\|u_i-v_i\|_{\mathcal H}
+\|\mathsf K_h^{(\ell)}\|_{\mathrm{op}}
+\|u_j\|_{\mathcal H} +
+\frac{1}{\tau}
+\|\mathsf Q_h^{(\ell)}\|_{\mathrm{op}}
+\|v_i\|_{\mathcal H}
+\|\mathsf K_h^{(\ell)}\|_{\mathrm{op}}
+\|u_j-v_j\|_{\mathcal H}\\
+&\leqslant
+\frac{B_Q^{(\ell,h)}B_K^{(\ell,h)}R}{\tau}
+\left(
+\|u_i-v_i\|_{\mathcal H}
++
+\|u_j-v_j\|_{\mathcal H}
+\right).
+\end{aligned}
+\]
+The first equality follows from the definition of the attention scores. The first inequality is obtained by adding and subtracting \(\langle \mathsf Q_h^{(\ell)}v_i,\mathsf K_h^{(\ell)}u_j\rangle_{\mathcal H_q}\) and applying the triangle inequality. The second inequality follows from the Cauchy--Schwarz inequality and definition of operator norm. The final inequality uses the architectural bounds \(\|\mathsf Q_h^{(\ell)}\|_{\mathrm{op}}\leqslant B_Q^{(\ell,h)}\), \(\|\mathsf K_h^{(\ell)}\|_{\mathrm{op}}\leqslant B_K^{(\ell,h)}\), and the fact that \(U,V\in\mathcal B_R\), so that \(\|u_j\|_{\mathcal H}\leqslant R\) and \(\|v_i\|_{\mathcal H}\leqslant R\).
+
+For fixed \(i\), define the score vector \(a_i(U)=(a_{i0}(U),\ldots,a_{i,n-1}(U))\in\mathbb R^n\). Let \(c={B_Q^{(\ell,h)}B_K^{(\ell,h)}R}/{\tau}\) and using the previous estimate:
+\[
+\begin{aligned}
+\|a_i(U)-a_i(V)\|_2
+&\leqslant c\left[\sum_{j=0}^{n-1}\left(\|u_i-v_i\|_{\mathcal H}+\|u_j-v_j\|_{\mathcal H}\right)^2\right]^{1/2}\\
+&\leqslant c\left[\left(\sum_{j=0}^{n-1}\|u_i-v_i\|_{\mathcal H}^2\right)^{1/2}+\left(\sum_{j=0}^{n-1}\|u_j-v_j\|_{\mathcal H}^2\right)^{1/2}\right]\\
+&=c\left[\sqrt n\,\|u_i-v_i\|_{\mathcal H}+\|U-V\|_{\mathcal H^n}\right]\\
+&\leqslant c(\sqrt n+1)\|U-V\|_{\mathcal H^n}.
+\end{aligned}
+\]
+The first inequality applies the componentwise score estimate. The second is the triangle inequality for the Euclidean norm, applied to the vectors whose \(j\)-th components are respectively \(\|u_i-v_i\|_{\mathcal H}\) and \(\|u_j-v_j\|_{\mathcal H}\). The equality uses \(\sum_{j=0}^{n-1}\|u_i-v_i\|_{\mathcal H}^2=n\|u_i-v_i\|_{\mathcal H}^2\) and the definition of the product norm on \(\mathcal H^n\). The final inequality follows because \(\|u_i-v_i\|_{\mathcal H}\leqslant\|U-V\|_{\mathcal H^n}\).
+
+By Lemma \ref{lem:Lipschitz continuity of softmax}, the corresponding attention-weight vectors satisfy \(\|\alpha_i(U)-\alpha_i(V)\|_2\leqslant\frac{B_Q^{(\ell,h)}B_K^{(\ell,h)}R}{2\tau}(\sqrt n+1)\|U-V\|_{\mathcal H^n}\).
+
+\textit{Step 2: Bound for the attention output.} For position \(i\), we have \(\mathcal A_h^{(\ell)}(U)_i=\sum_{j=0}^{n-1}\alpha_{ij}(U)\mathsf V_h^{(\ell)}u_j\). For each \(j\), we add and subtract the intermediate term \(\alpha_{ij}(V)\mathsf V_h^{(\ell)}u_j\). This gives
+\[
+\begin{aligned}
+\mathcal A_h^{(\ell)}(U)_i-\mathcal A_h^{(\ell)}(V)_i
+&=
+\sum_{j=0}^{n-1}
+\left[
+\alpha_{ij}(U)\mathsf V_h^{(\ell)}u_j
+-
+\alpha_{ij}(V)\mathsf V_h^{(\ell)}v_j
+\right]\\
+&=
+\sum_{j=0}^{n-1}
+\left[
+\alpha_{ij}(U)\mathsf V_h^{(\ell)}u_j
+-
+\alpha_{ij}(V)\mathsf V_h^{(\ell)}u_j
++
+\alpha_{ij}(V)\mathsf V_h^{(\ell)}u_j
+-
+\alpha_{ij}(V)\mathsf V_h^{(\ell)}v_j
+\right]\\
+&=
+\sum_{j=0}^{n-1}
+\bigl(
+\alpha_{ij}(U)-\alpha_{ij}(V)
+\bigr)
+\mathsf V_h^{(\ell)}u_j
++
+\sum_{j=0}^{n-1}
+\alpha_{ij}(V)
+\mathsf V_h^{(\ell)}(u_j-v_j).
+\end{aligned}
+\]
+The first term isolates the change in the attention weights, while the second isolates the change in the value functions.
+
+Let us estimate the first term:
+\[
+\begin{aligned}
+\left\|
+\sum_{j=0}^{n-1}
+\bigl(\alpha_{ij}(U)-\alpha_{ij}(V)\bigr)
+\mathsf V_h^{(\ell)}u_j
+\right\|_{\mathcal H_v}
+&\leqslant
+\sum_{j=0}^{n-1}
+\left|
+\alpha_{ij}(U)-\alpha_{ij}(V)
+\right|
+\left\|
+\mathsf V_h^{(\ell)}u_j
+\right\|_{\mathcal H_v}\\
+&\leqslant
+B_V^{(\ell,h)}
+\sum_{j=0}^{n-1}
+\left|
+\alpha_{ij}(U)-\alpha_{ij}(V)
+\right|
+\|u_j\|_{\mathcal H}\\
+&\leqslant
+B_V^{(\ell,h)}R
+\sum_{j=0}^{n-1}
+\left|
+\alpha_{ij}(U)-\alpha_{ij}(V)
+\right|\\
+&\leqslant
+B_V^{(\ell,h)}R\sqrt n\,
+\|\alpha_i(U)-\alpha_i(V)\|_2.
+\end{aligned}
+\]
+
+The first inequality follows from the triangle inequality in \(\mathcal H_v\). The second uses the architecture constraint \(\|\mathsf V_h^{(\ell)}\|_{\mathrm{op}}\leqslant B_V^{(\ell,h)}\). The third uses the bounded-token property \(\|u_j\|_{\mathcal H}\leqslant R\). The final inequality is the Cauchy--Schwarz inequality in \(\mathbb R^n\), \(\sum_{j=0}^{n-1}|x_j|\leqslant\sqrt n\,(\sum_{j=0}^{n-1}|x_j|^2)^{1/2}\).
+
+Using the previously established estimate for the attention weights, this gives
+\[
+\left\|
+\sum_{j=0}^{n-1}
+\bigl(\alpha_{ij}(U)-\alpha_{ij}(V)\bigr)
+\mathsf V_h^{(\ell)}u_j
+\right\|_{\mathcal H_v}
+\leqslant
+\frac{
+B_V^{(\ell,h)}
+B_Q^{(\ell,h)}
+B_K^{(\ell,h)}
+R^2
+\sqrt n(\sqrt n+1)
+}{
+2\tau
+}
+\|U-V\|_{\mathcal H^n}.
+\]
+For the second term
+\[
+\begin{aligned}
+\left\|
+\sum_{j=0}^{n-1}
+\alpha_{ij}(V)
+\mathsf V_h^{(\ell)}(u_j-v_j)
+\right\|_{\mathcal H_v}
+&\leqslant
+\sum_{j=0}^{n-1}
+\alpha_{ij}(V)
+\left\|
+\mathsf V_h^{(\ell)}(u_j-v_j)
+\right\|_{\mathcal H_v}\\
+&\leqslant
+B_V^{(\ell,h)}
+\sum_{j=0}^{n-1}
+\alpha_{ij}(V)
+\|u_j-v_j\|_{\mathcal H}\\
+&\leqslant
+B_V^{(\ell,h)}
+\left(
+\sum_{j=0}^{n-1}
+\alpha_{ij}(V)^2
+\right)^{1/2}
+\left(
+\sum_{j=0}^{n-1}
+\|u_j-v_j\|_{\mathcal H}^2
+\right)^{1/2}\\
+&\leqslant
+B_V^{(\ell,h)}
+\|U-V\|_{\mathcal H^n}.
+\end{aligned}
+\]
+The first inequality is again the triangle inequality in \(\mathcal H_v\), while the second follows from the operator-norm bound on \(\mathsf V_h^{(\ell)}\). The third inequality is Cauchy--Schwarz in \(\mathbb R^n\). For the final inequality, observe that the attention coefficients form a probability vector, so \(\|\alpha_i(V)\|_2\leqslant\|\alpha_i(V)\|_1=1\), while the second factor is exactly \(\|U-V\|_{\mathcal H^n}\).
+
+Combining the two terms and applying the triangle inequality on the decomposition, we obtain
+\[
+\|\mathcal A_h^{(\ell)}(U)_i-\mathcal A_h^{(\ell)}(V)_i\|_{\mathcal H_v}
+\leqslant
+B_V^{(\ell,h)}
+\left(
+1+
+\frac{
+B_Q^{(\ell,h)}
+B_K^{(\ell,h)}
+R^2
+\sqrt n(\sqrt n+1)
+}{
+2\tau
+}
+\right)
+\|U-V\|_{\mathcal H^n}.
+\]
+This bound holds for every output position \(i\). Therefore, using the product norm on \(\mathcal H_v^n\),
+\[
+\begin{aligned}
+\|\mathcal A_h^{(\ell)}(U)-\mathcal A_h^{(\ell)}(V)\|_{\mathcal H_v^n}^2
+&=
+\sum_{i=0}^{n-1}
+\|\mathcal A_h^{(\ell)}(U)_i-\mathcal A_h^{(\ell)}(V)_i\|_{\mathcal H_v}^2\\
+&\leqslant
+n
+\left[
+B_V^{(\ell,h)}
+\left(
+1+
+\frac{
+B_Q^{(\ell,h)}
+B_K^{(\ell,h)}
+R^2
+\sqrt n(\sqrt n+1)
+}{
+2\tau
+}
+\right)
+\right]^2
+\|U-V\|_{\mathcal H^n}^2.
+\end{aligned}
+\]
+
+Taking square roots concludes the proof.
+\end{proof}
+
+The constant \(L_{\mathrm{att}}^{(\ell,h)}\) therefore accounts for both sources of sensitivity in a single attention head. The term involving \(B_Q^{(\ell,h)}B_K^{(\ell,h)}R^2/\tau\) arises from the dependence of the attention weights on the query and key functions, while the remaining contribution arises from the change in the value functions themselves.
+
+A multi-head attention layer applies several such heads in parallel and subsequently combines their outputs through the linear operator \(\mathsf W_O^{(\ell)}\). The single-head bounds can therefore be combined to obtain a Lipschitz constant for the complete multi-head attention operator.
+
+\begin{corollary}[Lipschitz continuity of multi-head attention]
+\label{cor:Lipschitz continuity of multi-head attention}
+Consider the multi-head attention in layer \(\ell\). Then, the corresponding multi-head attention operator is Lipschitz: for any \(U,V \in \mathcal B_R\), \(\|\mathcal A_{\mathrm{MHA}}^{(\ell)}(U)-\mathcal A_{\mathrm{MHA}}^{(\ell)}(V)\|_{\mathcal H^n}\leqslant L_{\mathrm{MHA}}^{(\ell)}\|U-V\|_{\mathcal H^n}\), where \(L_{\mathrm{MHA}}^{(\ell)}=B_O^{(\ell)}\left(\sum_{h=1}^{N_h}(L_{\mathrm{att}}^{(\ell,h)})^2\right)^{1/2}\).
+\end{corollary}
+
+\begin{proof}
+For each context position \(i\), the multi-head attention output is obtained by concatenating the outputs of the \(N_h\) attention heads and then applying the output operator \(\mathsf W_O^{(\ell)}\). Hence
+\[
+\begin{aligned}
+&\|\mathcal A_{\mathrm{MHA}}^{(\ell)}(U)_i-\mathcal A_{\mathrm{MHA}}^{(\ell)}(V)_i\|_{\mathcal H}\\
+&\qquad=
+\left\|
+\mathsf W_O^{(\ell)}
+\left(
+\operatorname{Concat}
+\bigl(
+\mathcal A_1^{(\ell)}(U)_i,\ldots,\mathcal A_{N_h}^{(\ell)}(U)_i
+\bigr)
+-
+\operatorname{Concat}
+\bigl(
+\mathcal A_1^{(\ell)}(V)_i,\ldots,\mathcal A_{N_h}^{(\ell)}(V)_i
+\bigr)
+\right)
+\right\|_{\mathcal H}\\
+&\qquad\leqslant
+\|\mathsf W_O^{(\ell)}\|_{\mathrm{op}}
+\left[
+\sum_{h=1}^{N_h}
+\|\mathcal A_h^{(\ell)}(U)_i-\mathcal A_h^{(\ell)}(V)_i\|_{\mathcal H_v}^2
+\right]^{1/2}\\
+&\qquad\leqslant
+B_O^{(\ell)}
+\left[
+\sum_{h=1}^{N_h}
+\|\mathcal A_h^{(\ell)}(U)_i-\mathcal A_h^{(\ell)}(V)_i\|_{\mathcal H_v}^2
+\right]^{1/2}.
+\end{aligned}
+\]
+
+The first inequality follows from the definition of the operator norm. The norm of the concatenated vector is the square root of the sum of the squared norms of its head components, since concatenation places the head outputs in separate channel coordinates. The second inequality uses the architectural bound \(\|\mathsf W_O^{(\ell)}\|_{\mathrm{op}}\leqslant B_O^{(\ell)}\).
+
+We now sum over the \(n\) output positions:
+\[
+\begin{aligned}
+\|\mathcal A_{\mathrm{MHA}}^{(\ell)}(U)-\mathcal A_{\mathrm{MHA}}^{(\ell)}(V)\|_{\mathcal H^n}^2&=
+\sum_{i=0}^{n-1}
+\|\mathcal A_{\mathrm{MHA}}^{(\ell)}(U)_i-\mathcal A_{\mathrm{MHA}}^{(\ell)}(V)_i\|_{\mathcal H}^2\\
+&\leqslant
+\left(B_O^{(\ell)}\right)^2
+\sum_{i=0}^{n-1}
+\sum_{h=1}^{N_h}
+\|\mathcal A_h^{(\ell)}(U)_i-\mathcal A_h^{(\ell)}(V)_i\|_{\mathcal H_v}^2\\
+&=
+\left(B_O^{(\ell)}\right)^2
+\sum_{h=1}^{N_h}
+\|\mathcal A_h^{(\ell)}(U)-\mathcal A_h^{(\ell)}(V)\|_{\mathcal H_v^n}^2\\
+&\leqslant
+\left(B_O^{(\ell)}\right)^2
+\sum_{h=1}^{N_h}
+\left(L_{\mathrm{att}}^{(\ell,h)}\right)^2
+\|U-V\|_{\mathcal H^n}^2.
+\end{aligned}
+\]
+The final inequality follows by applying Lemma \ref{lem:functional-attention-Lipschitz} to each attention head and taking square roots concludes the proof.
+\end{proof}
+
+We have now controlled the attention component of a transformer layer. The remaining nonlinear component is the feed-forward network. Since it acts independently at each context position, its Lipschitz constant can be obtained first at the level of an individual functional token and then lifted directly to the product space \(\mathcal H^n\).
+
+\begin{lemma}[Lipschitz continuity of the feed-forward block]
+\label{lem:Lipschitz continuity of the feed-forward block}
+Suppose that the activation function \(\sigma\) is \(L_\sigma\)-Lipschitz. Then, the corresponding feed-forward operator is Lipschitz: for any \(U,V\in\mathcal H^n\), \(\|\mathcal F_\ell(U)-\mathcal F_\ell(V)\|_{\mathcal H^n} \leqslant L_{\mathrm{FF}}^{(\ell)} \|U-V\|_{\mathcal H^n}\), where \(L_{\mathrm{FF}}^{(\ell)}=B_2^{(\ell)}L_\sigma B_1^{(\ell)}\).
+\end{lemma}
+
+\begin{proof}
+Let \(U=(u_0,\ldots,u_{n-1})\in \mathcal H^n\) and \(V=(v_0,\ldots,v_{n-1})\in\mathcal H^n\). Since the feed-forward network acts independently on each context position, its \(j\)-th component is
+\(
+\mathcal F_\ell(u_j)(x)
+=
+\mathsf W_2^{(\ell)}
+\sigma\bigl(
+\mathsf W_1^{(\ell)}u_j(x)+b_1^{(\ell)}
+\bigr)
++
+b_2^{(\ell)}
+\).
+
+We first estimate the difference at a single context position:
+\[
+\begin{aligned}
+\|\mathcal F_\ell(u_j)-\mathcal F_\ell(v_j)\|_{\mathcal H}
+&=
+\left\|
+\mathsf W_2^{(\ell)}
+\left[
+\sigma\bigl(\mathsf W_1^{(\ell)}u_j+b_1^{(\ell)}\bigr)
+-
+\sigma\bigl(\mathsf W_1^{(\ell)}v_j+b_1^{(\ell)}\bigr)
+\right]
+\right\|_{\mathcal H}\\
+&\leqslant
+\|\mathsf W_2^{(\ell)}\|_{\mathrm{op}}
+\left\|
+\sigma\bigl(\mathsf W_1^{(\ell)}u_j+b_1^{(\ell)}\bigr)
+-
+\sigma\bigl(\mathsf W_1^{(\ell)}v_j+b_1^{(\ell)}\bigr)
+\right\|_{\mathcal H}\\
+&\leqslant
+\|\mathsf W_2^{(\ell)}\|_{\mathrm{op}}
+L_\sigma
+\|\mathsf W_1^{(\ell)}(u_j-v_j)\|_{\mathcal H}\\
+&\leqslant
+B_2^{(\ell)}
+L_\sigma
+B_1^{(\ell)}
+\|u_j-v_j\|_{\mathcal H}\\
+&=
+L_{\mathrm{FF}}^{(\ell)}
+\|u_j-v_j\|_{\mathcal H}.
+\end{aligned}
+\]
+In the first equality \(b_2^{(\ell)}\) cancels when the two feed-forward outputs are subtracted. The first inequality follows from the definition of the operator norm of \(\mathsf W_2^{(\ell)}\). The second inequality uses the \(L_\sigma\)-Lipschitz continuity of \(\sigma\). Since the same input bias \(b_1^{(\ell)}\) appears in both arguments, their difference is \(\mathsf W_1^{(\ell)}(u_j-v_j)\). The third uses the architectural bounds \(\|\mathsf W_1^{(\ell)}\|_{\mathrm{op}}\leqslant B_1^{(\ell)}\) and \(\|\mathsf W_2^{(\ell)}\|_{\mathrm{op}}\leqslant B_2^{(\ell)}\).
+
+We now combine these componentwise estimates using the product norm on \(\mathcal H^n\):
+\[
+\begin{aligned}
+\|\mathcal F_\ell(U)-\mathcal F_\ell(V)\|_{\mathcal H^n}^2
+&=
+\sum_{j=0}^{n-1}
+\|\mathcal F_\ell(u_j)-\mathcal F_\ell(v_j)\|_{\mathcal H}^2\\
+&\leqslant
+\sum_{j=0}^{n-1}
+\left(
+L_{\mathrm{FF}}^{(\ell)}
+\|u_j-v_j\|_{\mathcal H}
+\right)^2\\
+&=
+\left(
+L_{\mathrm{FF}}^{(\ell)}
+\right)^2
+\sum_{j=0}^{n-1}
+\|u_j-v_j\|_{\mathcal H}^2\\
+&=
+\left(
+L_{\mathrm{FF}}^{(\ell)}
+\right)^2
+\|U-V\|_{\mathcal H^n}^2.
+\end{aligned}
+\]
+Taking square roots concludes the proof.
+\end{proof}
+
+The attention and feed-forward components of each transformer layer therefore have explicit Lipschitz bounds. It remains to account for the residual connections and projections that combine these components. Residual connections add the identity map to the corresponding attention or feed-forward transformation, while the projections do not increase distances by Lemma~\ref{lem:Non-expansiveness of the bounded projection}. This allows the Lipschitz constants to be propagated through each complete transformer layer and subsequently through the full depth of the network.
+
+\begin{proposition}[Lipschitz continuity of the functional transformer]
+\label{prop:Lipschitz continuity of the functional transformer}
+The latent next-function representation operator \(h_\Theta:E\to\mathcal H\) is Lipschitz: for any \(F,G \in E\), \(\|h_\Theta(F)-h_\Theta(G)\|_{\mathcal H}\leqslant L_{\mathcal T}\|F-G\|_{H^n}\), where \(L_{\mathcal T}=B_{\mathrm{in}}\prod_{\ell=0}^{L-1}L_\ell\) with \(L_\ell=\left(1+\xi_\ell L_{\mathrm{FF}}^{(\ell)}\right)\left(1+\eta_\ell L_{\mathrm{MHA}}^{(\ell)}\right)\). 
+\end{proposition}
+
+\begin{proof}
+Let \(F=(f_0,\ldots,f_{n-1})\in E\) and \(G=(g_0,\ldots,g_{n-1}) \in E\) be two functional contexts. We propagate their difference through each stage of the transformer architecture.
+
+\textit{Step 1: Functional embedding and initial projection.} For each context position \(j\), the unprojected embeddings are \(\widetilde v_j^{(0)}(F)=\mathsf T_{\mathrm{in}}f_j+p_j\) and \(\widetilde v_j^{(0)}(G)=\mathsf T_{\mathrm{in}}g_j+p_j\). Using the product norm on \(\mathcal H^n\),
+\[
+\begin{aligned}
+\|V^{(0)}(F)-V^{(0)}(G)\|_{\mathcal H^n}^2
+&=
+\sum_{j=0}^{n-1}
+\left\|
+\Pi_R\bigl(\mathsf T_{\mathrm{in}}f_j+p_j\bigr)
+-
+\Pi_R\bigl(\mathsf T_{\mathrm{in}}g_j+p_j\bigr)
+\right\|_{\mathcal H}^2\\
+&\leqslant
+\sum_{j=0}^{n-1}
+\left\|
+\mathsf T_{\mathrm{in}}(f_j-g_j)
+\right\|_{\mathcal H}^2\\
+&\leqslant
+B_{\mathrm{in}}^2
+\sum_{j=0}^{n-1}
+\|f_j-g_j\|_H^2\\
+&=
+B_{\mathrm{in}}^2
+\|F-G\|_{H^n}^2.
+\end{aligned}
+\]
+
+The first equality follows from the definition of the product norm on \(\mathcal H^n\). The first inequality follows from Lemma \ref{lem:Non-expansiveness of the bounded projection}, together with the cancellation of the positional embeddings. The second inequality uses the operator-norm bound \(\|\mathsf T_{\mathrm{in}}\|_{\mathrm{op}}\leqslant B_{\mathrm{in}}\). The final equality is the definition of the product norm on \(H^n\).
+
+\textit{Step 2: Attention residual block.} Let \(U,V\in\mathcal B_R\) be two inputs to layer \(\ell\). The attention residual update is \(Z(U)=\Pi_R^{(n)}\left(U+\eta_\ell\mathcal A_{\mathrm{MHA}}^{(\ell)}(U)\right)\), hence
+\[
+\begin{aligned}
+\|Z(U)-Z(V)\|_{\mathcal H^n}
+&\leqslant
+\left\|
+(U-V)
++
+\eta_\ell
+\left(
+\mathcal A_{\mathrm{MHA}}^{(\ell)}(U)
+-
+\mathcal A_{\mathrm{MHA}}^{(\ell)}(V)
+\right)
+\right\|_{\mathcal H^n}\\
+&\leqslant
+\|U-V\|_{\mathcal H^n}
++
+\eta_\ell
+\left\|
+\mathcal A_{\mathrm{MHA}}^{(\ell)}(U)
+-
+\mathcal A_{\mathrm{MHA}}^{(\ell)}(V)
+\right\|_{\mathcal H^n}\\
+&\leqslant
+\left(
+1+\eta_\ell L_{\mathrm{MHA}}^{(\ell)}
+\right)
+\|U-V\|_{\mathcal H^n}.
+\end{aligned}
+\]
+The first inequality follows from Lemma \ref{lem:Non-expansiveness of the bounded projection}. The second inequality is the triangle inequality in \(\mathcal H^n\). The third inequality follows from the Lipschitz continuity of multi-head attention established in Corollary~\ref{cor:Lipschitz continuity of multi-head attention}.
+
+\textit{Step 3: Feed-forward residual block.} The feed-forward residual update is \(V^{+}(Z)=\Pi_R^{(n)}\left(Z+\xi_\ell\mathcal F_\ell(Z)\right)\). For \(Z_1,Z_2\in\mathcal H^n\),
+\[
+\begin{aligned}
+\|V^{+}(Z_1)-V^{+}(Z_2)\|_{\mathcal H^n}
+&\leqslant
+\left\|
+(Z_1-Z_2)
++
+\xi_\ell
+\left(
+\mathcal F_\ell(Z_1)
+-
+\mathcal F_\ell(Z_2)
+\right)
+\right\|_{\mathcal H^n}\\
+&\leqslant
+\|Z_1-Z_2\|_{\mathcal H^n}
++
+\xi_\ell
+\|\mathcal F_\ell(Z_1)-\mathcal F_\ell(Z_2)\|_{\mathcal H^n}\\
+&\leqslant
+\left(
+1+\xi_\ell L_{\mathrm{FF}}^{(\ell)}
+\right)
+\|Z_1-Z_2\|_{\mathcal H^n}.
+\end{aligned}
+\]
+The first inequality again follows from Lemma \ref{lem:Non-expansiveness of the bounded projection}. The second is the triangle inequality in \(\mathcal H^n\). The final inequality follows from the Lipschitz continuity of the feed-forward block established in Lemma~\ref{lem:Lipschitz continuity of the feed-forward block}.
+
+Combining the attention and feed-forward residual blocks, we obtain
+\[
+\begin{aligned}
+\|V^{(\ell+1)}(U)-V^{(\ell+1)}(V)\|_{\mathcal H^n}
+&\leqslant
+\left(
+1+\xi_\ell L_{\mathrm{FF}}^{(\ell)}
+\right)
+\|Z(U)-Z(V)\|_{\mathcal H^n}\\
+&\leqslant
+\left(
+1+\xi_\ell L_{\mathrm{FF}}^{(\ell)}
+\right)
+\left(
+1+\eta_\ell L_{\mathrm{MHA}}^{(\ell)}
+\right)
+\|U-V\|_{\mathcal H^n}\\
+&=
+L_\ell\|U-V\|_{\mathcal H^n}.
+\end{aligned}
+\]
+The first inequality applies the Lipschitz bound for the feed-forward residual block to the two attention outputs \(Z(U)\) and \(Z(V)\). The second inequality then applies the Lipschitz bound for the attention residual block. The final equality follows from the definition \(L_\ell=\left(1+\xi_\ell L_{\mathrm{FF}}^{(\ell)}\right)\left(1+\eta_\ell L_{\mathrm{MHA}}^{(\ell)}\right)\).
+
+\textit{Step 4: Composition of the transformer layers.} Applying the layerwise estimate recursively gives
+\[
+\begin{aligned}
+\|V^{(L)}(F)-V^{(L)}(G)\|_{\mathcal H^n}
+&\leqslant
+L_{L-1}
+\|V^{(L-1)}(F)-V^{(L-1)}(G)\|_{\mathcal H^n}\\
+&\leqslant
+L_{L-1}L_{L-2}
+\|V^{(L-2)}(F)-V^{(L-2)}(G)\|_{\mathcal H^n}\\
+&\;\;\vdots\\
+&\leqslant
+\left(
+\prod_{\ell=0}^{L-1}L_\ell
+\right)
+\|V^{(0)}(F)-V^{(0)}(G)\|_{\mathcal H^n}\\
+&\leqslant
+B_{\mathrm{in}}
+\left(
+\prod_{\ell=0}^{L-1}L_\ell
+\right)
+\|F-G\|_{H^n}\\
+&=
+L_{\mathcal T}\|F-G\|_{H^n}.
+\end{aligned}
+\]
+
+The first three inequalities repeatedly apply the Lipschitz bound \(L_\ell\) for each transformer layer. The penultimate inequality uses the initial embedding bound established in Step 1. The final equality follows from the definition \(L_{\mathcal T}=B_{\mathrm{in}}\prod_{\ell=0}^{L-1}L_\ell\).
+
+\textit{Step 5: Readout.} The final representation is obtained by applying the readout operator \(\mathsf R_{\mathrm{out}}:\mathcal H^n\to\mathcal H\), defined by \(\mathsf R_{\mathrm{out}}(v_0,\ldots,v_{n-1})=v_{n-1}\). Therefore
+\[
+\begin{aligned}
+\|h_\Theta(F)-h_\Theta(G)\|_{\mathcal H}
+&=
+\left\|
+\mathsf R_{\mathrm{out}}\bigl(V^{(L)}(F)-V^{(L)}(G)\bigr)
+\right\|_{\mathcal H}\\
+&\leqslant
+\|\mathsf R_{\mathrm{out}}\|_{\mathrm{op}}
+\|V^{(L)}(F)-V^{(L)}(G)\|_{\mathcal H^n}\\
+&=
+\|V^{(L)}(F)-V^{(L)}(G)\|_{\mathcal H^n}\\
+&\leqslant
+L_{\mathcal T}\|F-G\|_{H^n}.
+\end{aligned}
+\]
+
+The first equality follows from the definition \(h_\Theta(F)=\mathsf R_{\mathrm{out}}(V^{(L)}(F))\) and linearity of \(\mathsf R_{\mathrm{out}}\). The first inequality is the definition of the operator norm. The second equality uses \(\|\mathsf R_{\mathrm{out}}\|_{\mathrm{op}}=1\), since \(\mathsf R_{\mathrm{out}}\) is the projection onto the final coordinate. The final inequality follows from Step 4.
+
+Therefore \(h_\Theta:E\to\mathcal H\) is globally Lipschitz with Lipschitz constant at most \(L_{\mathcal T}\).
+\end{proof}
+
+Proposition~\ref{prop:Lipschitz continuity of the functional transformer} provides a finite constant \(L_{\mathcal T}\) controlling the sensitivity of the final latent representation. We now propagate this estimate through the coefficient heads and use the isometry of \(\mathsf E_d\).
+
+\begin{corollary}[Lipschitz continuity of the Gaussian parameter maps]
+\label{cor:Lipschitz continuity of the Gaussian parameter maps}
+Let \(L_m^{\mathrm{head}}\) be a Lipschitz constant for
+\(\widetilde{\mathsf T}_m:\mathcal H\to\mathbb R^d\), and let
+\(L_{C,k}^{\mathrm{head}}\) be a Lipschitz constant for
+\(\widetilde{\mathsf T}_{C,k}:\mathcal H\to\mathbb R^d\).
+Then, the Gaussian parameter maps are Lipschitz:
+\(\|m_\Theta(F)-m_\Theta(G)\|_H
+\leq L_m\|F-G\|_{H^n}\),
+where \(L_m=L_m^{\mathrm{head}}L_{\mathcal T}\), and
+\(\|c_{k,\Theta}(F)-c_{k,\Theta}(G)\|_H
+\leq L_{C,k}\|F-G\|_{H^n}\),
+where \(L_{C,k}=L_{C,k}^{\mathrm{head}}L_{\mathcal T}\).
+\end{corollary}
+
+\begin{proof}
+For the mean map, the isometry of \(\mathsf E_d\) gives
+\[
+\begin{aligned}
+\|m_\Theta(F)-m_\Theta(G)\|_H
+&=\|\mu_\Theta(F)-\mu_\Theta(G)\|_2\\
+&\leqslant L_m^{\mathrm{head}}\|h_\Theta(F)-h_\Theta(G)\|_{\mathcal H}\\
+&\leqslant L_m^{\mathrm{head}}L_{\mathcal T}\|F-G\|_{H^n}.
+\end{aligned}
+\]
+The covariance-factor estimate is identical:
+\[
+\begin{aligned}
+\|c_{k,\Theta}(F)-c_{k,\Theta}(G)\|_H
+&=\|\gamma_{k,\Theta}(F)-\gamma_{k,\Theta}(G)\|_2\\
+&\leqslant L_{C,k}^{\mathrm{head}}L_{\mathcal T}\|F-G\|_{H^n}.
+\end{aligned}
+\]
+\end{proof}
+
+We have therefore obtained explicit Lipschitz bounds for all of the quantities that determine the conditional Gaussian distribution produced by the transformer. The constants \(L_m\) and \(L_{C,k}\) are finite consequences of the bounded projections, finite operator-norm constraints, and Lipschitz nonlinearities.
+
+The preceding corollary gives explicit control of the mean and covariance-factor maps in terms of the architecture. We can now translate these bounds into stability of the Gaussian output distribution in Wasserstein distance.
+
+\begin{proposition}[Lipschitz continuity of the Gaussian output kernel]
+\label{prop:Lipschitz continuity of the Gaussian output kernel}
+For any \(F,G\in E\), we have the estimate \( W_2\bigl(Q_\Theta(F,\cdot),Q_\Theta(G,\cdot)\bigr)\leqslant L_\Theta\|F-G\|_\beta\), where \(L_\Theta^2=L_m^2+\sum_{k=1}^rL_{C,k}^2\).
+\end{proposition}
+
+\begin{proof}
+By Proposition~\ref{prop:Wasserstein stability of the Gaussian output}, \(W_2^2\bigl(Q_\Theta(F,\cdot),Q_\Theta(G,\cdot)\bigr)\leqslant
+\|m_\Theta(F)-m_\Theta(G)\|_H^2+\sum_{k=1}^r
+\|c_{k,\Theta}(F)-c_{k,\Theta}(G)\|_H^2
+\). Then,
+\[
+\begin{aligned}
+W_2^2\bigl(Q_\Theta(F,\cdot),Q_\Theta(G,\cdot)\bigr)
+&\leqslant
+L_m^2\|F-G\|_{H^n}^2
++
+\sum_{k=1}^r
+L_{C,k}^2\|F-G\|_{H^n}^2\\
+&=
+\left(
+L_m^2+\sum_{k=1}^rL_{C,k}^2
+\right)
+\|F-G\|_{H^n}^2\\
+&=
+L_\Theta^2\|F-G\|_{H^n}^2\\
+&\leqslant
+L_\Theta^2\|F-G\|_{\beta}^2.
+\end{aligned}
+\]
+The first inequality applied Corollary~\ref{cor:Lipschitz continuity of the Gaussian parameter maps} to each term. The first equality factors out the common term \(\|F-G\|_{H^n}^2\), while the second follows from the definition \(L_\Theta^2=L_m^2+\sum_{k=1}^rL_{C,k}^2\). The last inequality follows from \(\beta>1\) implying \(\|F-G\|_{H^n}^2
+=
+\sum_{j=0}^{n-1}\|f_j-g_j\|_H^2
+\leqslant
+\sum_{j=0}^{n-1}\beta^j\|f_j-g_j\|_H^2
+=
+\|F-G\|_\beta^2.
+\)
+Taking square roots concludes the proof.
+\end{proof}
+
+The constant \(L_\Theta\) measures the sensitivity of the conditional Gaussian law to changes in the functional context. It is used in Section~\ref{subsec:Wasserstein and metric dependence} to obtain a Lipschitz constant for the pretraining loss and is also useful for perturbation estimates.

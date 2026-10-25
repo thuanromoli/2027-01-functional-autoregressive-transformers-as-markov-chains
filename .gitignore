@@ -1,3 +1,6 @@
 
 # macOS Finder metadata
 .DS_Store
+
+# Generated LaTeX output (including the compiled PDF)
+/latex/build/
