@@ -11,7 +11,7 @@ In parallel, functional data analysis and functional time-series theory study fu
 A separate literature develops concentration tools for dependent observations, including Marton-coupling bounded-difference inequalities \cite{Paulin2015} and transportation inequalities for dependent sequences \cite{DjelloutGuillinWu2004}. These provide general probabilistic machinery rather than model-specific generalisation guarantees. In the present setting, this leaves the statistical question of how dependence in the pretraining data affects transition-risk estimation, separately from the long-term behaviour of the recursively generated process.
 
 \paragraph{Research questions.}
-The thesis addresses four questions.
+The thesis addresses five questions.
 \begin{enumerate}[label=(Q\arabic*)]
     \item How can a functional autoregressive transformer be defined so that every context produces a valid conditional probability measure and the resulting shift-and-append update is a Borel Markov transition kernel?
 
@@ -20,6 +20,8 @@ The thesis addresses four questions.
     \item For a fixed model parameter, how can the gap between empirical and population pretraining risk be controlled when the functional observations are dependent, and what explicit sample-complexity guarantees follow under zero empirical risk?
 
     \item How do coupling-based and metric-transport approaches differ in their assumptions and applicability across independent trajectories, overlapping windows, mixing chains, and continuous function-valued dynamics?
+
+    \item How can a pretrained model's transition risk on a functional in-context task be controlled through comparison models, task-process dependence, and the approximation restrictions of its output law?
 \end{enumerate}
 
 \paragraph{Main contributions.}
@@ -34,7 +36,9 @@ The principal contributions are as follows.
     \item For a fixed parameter value, a squared Wasserstein loss between reference and model transition kernels is introduced and shown to reduce exactly to the discrepancy between their conditional output laws. Under a uniform second-moment assumption, Marton coupling and dependent bounded differences give a high-probability generalisation bound and an explicit pretraining sample-complexity bound under zero empirical risk.
 
     \item A complementary generalisation theory is developed for metric-dependent functional trajectories. A path-space transportation inequality and Wasserstein stability of the reference and model kernels yield concentration for Lipschitz empirical losses and a second zero-risk sample-complexity bound. The architectural Lipschitz estimates required for this result are proved in the appendix, and the thesis distinguishes these pretraining assumptions from the ergodicity of the recursively generated inference chain.
+
+    \item The in-context learning analysis of \cite[Section~6]{ZekriEtAl2025} is extended to functional task processes. A squared-Wasserstein model-comparison inequality yields Marton-coupling, mixing-time, and metric generalisation bounds with simultaneous control of comparison models and explicit residual-dependent sample complexities. Applications include heat-equation trajectories and task laws with infinite-rank noise, together with projection and covariance error floors for the finite-dimensional model output.
 \end{enumerate}
 
 \paragraph{Organisation of the thesis.}
-Section~\ref{sec:Preliminaries} introduces the mathematical tools used throughout and defines the functional autoregressive transformer. Section~\ref{sec:General state-space Markov chain framework for functional autoregressive transformers} establishes the Markov-chain formulation, Gaussian-kernel well-posedness, and the Chain's geometric ergodicity. Section~\ref{sec:Fixed-parameter pretraining generalisation} develops the transition loss, the Marton-coupling generalisation and sample-complexity results, the transportation-based metric theory, and the applicability of both approaches to different pretraining-data regimes. Section~\ref{sec:Conclusion and future work} summarises the results and outlines directions for extending the model and theory. Appendix~\ref{app:Lipschitz regularity} proves the global Lipschitz estimates used in the metric generalisation analysis.
+Section~\ref{sec:Preliminaries} introduces the mathematical tools used throughout and defines the functional autoregressive transformer. Section~\ref{sec:General state-space Markov chain framework for functional autoregressive transformers} establishes the Markov-chain formulation, Gaussian-kernel well-posedness, and the Chain's geometric ergodicity. Section~\ref{sec:Fixed-parameter pretraining generalisation} develops the transition loss, the Marton-coupling generalisation and sample-complexity results, the transportation-based metric theory, and the applicability of both approaches to different pretraining-data regimes. Section~\ref{sec:In-context learning} develops the task-specific in-context generalisation and sample-complexity results, verifies their assumptions in functional examples, and identifies approximation limits. Section~\ref{sec:Conclusion and future work} summarises the results and outlines directions for extending the model and theory. Appendix~\ref{app:Lipschitz regularity} proves the global Lipschitz estimates used in the metric generalisation analysis.

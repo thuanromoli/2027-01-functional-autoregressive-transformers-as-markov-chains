@@ -16,7 +16,12 @@ created automatically and excluded from Git. The compiled thesis is
 
 The bibliography is processed with Biber through `latexmk`.
 
-Configure your editor to use `latexmk` with `latex/` as its working directory.
+For VS Code, open the project root as the workspace. The project's
+`.vscode/settings.json` configures LaTeX Workshop to build into `latex/build/`
+and find the PDF there. This is necessary because LaTeX Workshop's default
+recipe passes an explicit output directory, overriding `.latexmkrc`.
+
+For other editors, use `latexmk` with `latex/` as its working directory.
 If it invokes `pdflatex` directly, use `-output-directory=build` instead; direct
 `pdflatex` builds do not read `.latexmkrc` or run Biber automatically.
 

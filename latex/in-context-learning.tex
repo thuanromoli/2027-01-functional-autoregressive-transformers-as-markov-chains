@@ -1,0 +1,858 @@
+\section{In-context learning of functional transition laws}
+\label{sec:In-context learning}
+
+This section extends the in-context learning analysis of \cite[Sections~6.1--6.2]{ZekriEtAl2025} to functional autoregressive transformers. A pretrained model is presented with observations from a task-specific functional process, and its parameters remain fixed throughout evaluation. The aim is to control its population transition risk by the empirical task risk of a comparison model, the discrepancy between the two models on task contexts, and a concentration term accounting for dependence along the observed trajectory.
+
+The analysis proceeds in four stages. We first specify the task process, comparison models, and transition risks, and prove a comparison inequality adapted to the squared Wasserstein loss. We then establish generalisation and sample-complexity bounds through Marton couplings, including an explicit mixing-time formulation. Next, we develop a complementary Wasserstein approach for contractive functional dynamics and give an unsquared-loss alternative. Finally, we verify the assumptions for mixing processes, heat-equation trajectories, and a stochastic functional recursion, and identify approximation floors imposed by the architecture.
+
+The ambient space \(H\) may be infinite dimensional, and the task conditional laws need not have finite-dimensional support. The model remains the architecture defined in Section~\ref{subsec:Functional autoregressive transformer}, whose outputs lie in the fixed approximation space \(S_d\). Thus the results concern statistical guarantees on \(H^n\), without presupposing an infinite-rank model output or a limit as \(d\to\infty\).
+
+\subsection{Task process, comparison models, and transition risks}
+\label{subsec:ICL setup}
+
+Fix a real separable Hilbert space \(H\), a context length \(n\in\mathbb N\), and \(\beta>1\). We retain the context space \(E=H^n\) and weighted norm of Definition~\ref{def:Weighted context norm}, and abbreviate
+\[
+\|F\|_\beta^2=\sum_{j=0}^{n-1}\beta^j\|f_j\|_H^2,
+\qquad s=\beta^{n-1}.
+\]
+All probability statements below concern one fixed task. If a task parameter is sampled and then held fixed, the analysis is conditional on that parameter. This distinction matters because a mixture of task-specific Markov processes need not itself be Markov on \(E\).
+
+\begin{assumption}[Finite-memory task dynamics]
+\label{ass:ICL task dynamics}
+There is a Borel probability kernel \(Q^{\mathrm{icl}}:E\times\mathcal B(H)\to[0,1]\), with \(Q^{\mathrm{icl}}(F,\cdot)\in\mathcal P_2(H)\) for every \(F\in E\), such that the observed functional sequence satisfies
+\[
+\mathbb P(X_{i+n}\in A\mid X_1,\ldots,X_{i+n-1})
+=Q^{\mathrm{icl}}(F_i,A),
+\qquad F_i=(X_i,\ldots,X_{i+n-1}),
+\]
+almost surely, for every \(A\in\mathcal B(H)\) and \(i\geqslant1\).
+\end{assumption}
+
+Under this assumption, the contexts form a time-homogeneous Markov chain with transition kernel
+\begin{equation}
+\label{eq:ICL task context kernel}
+P^{\mathrm{icl}}(F,A)
+=\int_H\mathbf1_A(f_1,\ldots,f_{n-1},y)\,
+Q^{\mathrm{icl}}(F,\mathrm dy),
+\qquad A\in\mathcal B(E).
+\end{equation}
+Indeed, the next context is obtained by shifting \(F_i\) and appending \(X_{i+n}\), whose conditional law given the entire observed past depends only on \(F_i\). Borel measurability follows by the same argument as Proposition~\ref{prop:Markov transition kernel}. For a first-order task chain with kernel \(K\), one simply takes \(Q^{\mathrm{icl}}(F,\cdot)=K(f_{n-1},\cdot)\). A finite window of an arbitrary process does not automatically satisfy the Markov property; Assumption~\ref{ass:ICL task dynamics} specifies the required predictive sufficiency of the window.
+
+We observe \(N=N_{\mathrm{icl}}\) successive contexts \(F_1,\ldots,F_N\). These require \(N+n-1\) function observations, or \(N+n\) observations if every corresponding successor is also recorded. The number \(N\) counts evaluated windows, whereas \(n\) is the fixed architectural context length. In particular, increasing \(N\) does not change the number of functions visible to the model at any one prediction.
+
+Let \(\Theta\) be the pretrained parameter and let \(\mathcal V=\{\vartheta_1,\ldots,\vartheta_m\}\) be a nonempty finite family of comparison parameters. Both \(\Theta\) and \(\mathcal V\) are fixed before observing the evaluated task trajectory. A comparator represents a task-specialist reference model; introducing it does not require fitting or updating a model during evaluation. The results also hold conditionally on independently obtained pretraining information, provided the stated assumptions hold for the resulting conditional task law. Extensions to larger comparison families are given below.
+
+\begin{assumption}[Uniform task and model moments]
+\label{ass:ICL uniform moments}
+There are finite constants \(M_{2,\mathrm{icl}}\) and \(\overline M_2\) such that
+\[
+\sup_{F\in E}\int_H\|y\|_H^2Q^{\mathrm{icl}}(F,\mathrm dy)
+\leqslant M_{2,\mathrm{icl}},
+\qquad
+\sup_{\psi\in\mathcal V\cup\{\Theta\}}\sup_{F\in E}
+\int_H\|y\|_H^2Q_\psi(F,\mathrm dy)
+\leqslant\overline M_2.
+\]
+\end{assumption}
+
+For a finite model family, Lemma~\ref{lem:Uniform conditional second moment} supplies the second bound by taking the maximum of
+\[
+M_{2,\psi}=M_{m,\psi}^2+d\sigma_0^2+\sum_{k=1}^rM_{C,k,\psi}^2.
+\]
+Throughout the squared-loss analysis, set
+\begin{equation}
+\label{eq:ICL loss bound constant}
+B=s\left(\sqrt{M_{2,\mathrm{icl}}}+\sqrt{\overline M_2}\right)^2.
+\end{equation}
+
+\begin{definition}[In-context transition risk]
+\label{def:ICL transition risk}
+For a parameter \(\psi\in\mathcal V\cup\{\Theta\}\), define
+\begin{align}
+\ell_\psi^{\mathrm{icl}}(F)
+&=W_{2,\beta}^2\bigl(P^{\mathrm{icl}}(F,\cdot),P_\psi(F,\cdot)\bigr)
+=sW_2^2\bigl(Q^{\mathrm{icl}}(F,\cdot),Q_\psi(F,\cdot)\bigr),
+\label{eq:ICL transition loss}\\
+\widehat{\mathcal R}_N^{\mathrm{icl}}(\psi)
+&=\frac1N\sum_{i=1}^N\ell_\psi^{\mathrm{icl}}(F_i),
+\qquad
+\mathcal R_N^{\mathrm{icl}}(\psi)
+=\mathbb E\bigl[\widehat{\mathcal R}_N^{\mathrm{icl}}(\psi)\bigr].
+\label{eq:ICL risks}
+\end{align}
+The expectation is over the task trajectory, with its specified initial law.
+\end{definition}
+
+The equality in \eqref{eq:ICL transition loss} is Proposition~\ref{prop:Reduction of context transition loss} applied to the task kernel. Proposition~\ref{prop:Uniform boundedness of fixed-parameter loss}, with the task and model moment bounds, gives
+\begin{equation}
+\label{eq:ICL bounded losses}
+0\leqslant\ell_\psi^{\mathrm{icl}}(F)\leqslant B
+\qquad(F\in E,\ \psi\in\mathcal V\cup\{\Theta\}).
+\end{equation}
+No stationarity is assumed. In particular, with
+\(\overline\mu_N=N^{-1}\sum_{i=1}^N\mathcal L(F_i)\), the population risk is \(\mathcal R_N^{\mathrm{icl}}(\psi)=\int_E\ell_\psi^{\mathrm{icl}}\,\mathrm d\overline\mu_N\). If the task chain is stationary, this becomes integration against its invariant law.
+
+\begin{definition}[Task-weighted model discrepancy]
+\label{def:ICL model discrepancy}
+For two model parameters, define
+\begin{align}
+\mathcal K_N(\vartheta,\Theta)
+&=\frac{\sqrt s}{N}\sum_{i=1}^N
+\mathbb E W_2\bigl(Q_\vartheta(F_i,\cdot),Q_\Theta(F_i,\cdot)\bigr),
+\label{eq:ICL population discrepancy}\\
+\mathcal D_N(\vartheta,\Theta)
+&=\frac{s}{N}\sum_{i=1}^N
+\mathbb E W_2^2\bigl(Q_\vartheta(F_i,\cdot),Q_\Theta(F_i,\cdot)\bigr).
+\label{eq:ICL squared discrepancy}
+\end{align}
+\end{definition}
+
+The quantity \(\mathcal K_N\) is a pseudometric on the model output kernels: symmetry and the triangle inequality follow from those of \(W_2\), while zero discrepancy identifies kernels agreeing \(\overline\mu_N\)-almost everywhere. It measures disagreement between predictions under the task context distribution. It is therefore a model-comparison term, rather than a distance between the pretraining and task data distributions themselves.
+
+The comparison argument in \cite[Theorem~6.1]{ZekriEtAl2025} uses the triangle inequality for total variation. Since \(W_2^2\) is not a metric, retaining the squared loss requires the following modification.
+
+\begin{lemma}[Comparison of squared transition risks]
+\label{lem:ICL risk comparison}
+Under Assumption~\ref{ass:ICL uniform moments}, every comparator satisfies
+\begin{align}
+\mathcal R_N^{\mathrm{icl}}(\Theta)
+&\leqslant\mathcal R_N^{\mathrm{icl}}(\vartheta)
++2\sqrt B\,\mathcal K_N(\vartheta,\Theta),
+\label{eq:ICL linear comparison}\\
+\sqrt{\mathcal R_N^{\mathrm{icl}}(\Theta)}
+&\leqslant\sqrt{\mathcal R_N^{\mathrm{icl}}(\vartheta)}
++\sqrt{\mathcal D_N(\vartheta,\Theta)}.
+\label{eq:ICL root comparison}
+\end{align}
+\end{lemma}
+
+\begin{proof}
+For \(F\in E\), put
+\[
+a(F)=\sqrt s\,W_2\bigl(Q^{\mathrm{icl}}(F,\cdot),Q_\Theta(F,\cdot)\bigr),
+\qquad
+b(F)=\sqrt s\,W_2\bigl(Q^{\mathrm{icl}}(F,\cdot),Q_\vartheta(F,\cdot)\bigr).
+\]
+By \eqref{eq:ICL bounded losses}, \(a,b\leqslant\sqrt B\). The reverse triangle inequality for \(W_2\) gives
+\[
+|a(F)-b(F)|\leqslant\sqrt s\,
+W_2\bigl(Q_\Theta(F,\cdot),Q_\vartheta(F,\cdot)\bigr).
+\]
+Consequently,
+\begin{equation}
+\label{eq:ICL pointwise comparison}
+\begin{aligned}
+|\ell_\Theta^{\mathrm{icl}}(F)-\ell_\vartheta^{\mathrm{icl}}(F)|
+&=(a(F)+b(F))|a(F)-b(F)|\\
+&\leqslant2\sqrt B\sqrt s\,
+W_2\bigl(Q_\Theta(F,\cdot),Q_\vartheta(F,\cdot)\bigr).
+\end{aligned}
+\end{equation}
+Integrating against \(\overline\mu_N\) proves \eqref{eq:ICL linear comparison}.
+
+For the second assertion, define
+\[
+c(F)=\sqrt s\,W_2\bigl(Q_\vartheta(F,\cdot),Q_\Theta(F,\cdot)\bigr).
+\]
+The triangle inequality gives \(a(F)\leqslant b(F)+c(F)\). Minkowski's inequality in \(L^2(\overline\mu_N)\) therefore yields
+\[
+\|a\|_{L^2(\overline\mu_N)}
+\leqslant\|b\|_{L^2(\overline\mu_N)}+\|c\|_{L^2(\overline\mu_N)}.
+\]
+The three squared norms are respectively \(\mathcal R_N^{\mathrm{icl}}(\Theta)\), \(\mathcal R_N^{\mathrm{icl}}(\vartheta)\), and \(\mathcal D_N(\vartheta,\Theta)\), which proves \eqref{eq:ICL root comparison}.
+\end{proof}
+
+If separate bounds \(B_\Theta\) and \(B_\vartheta\) are retained, the coefficient \(2\sqrt B\) in \eqref{eq:ICL linear comparison} can be replaced by \(\sqrt{B_\Theta}+\sqrt{B_\vartheta}\). The common bound is convenient when comparing several models simultaneously.
+
+\begin{remark}[Interpretation and observability of the risk]
+\label{rem:ICL oracle risk}
+The loss in \eqref{eq:ICL transition loss} compares conditional probability laws. A single observed successor does not generally reveal this loss, since it does not determine \(Q^{\mathrm{icl}}(F,\cdot)\). The empirical risks are directly evaluable when the task law is known, as in a synthetic experiment. Estimating that law from observations, or replacing this loss by an observable scoring rule, requires an additional statistical argument.
+\end{remark}
+
+\subsection{Marton-coupling generalisation bounds and sample complexity}
+\label{subsec:ICL Marton bounds}
+
+We first use the boundedness of the loss and the Marton framework from Section~\ref{subsec:Marton coupling generalisation}. The dependence assumption concerns the evaluated task contexts, rather than the recursively generated model chain. Only a simultaneous concentration event allows minimisation over the comparison family.
+
+\begin{theorem}[Marton generalisation bound for in-context learning]
+\label{thm:ICL Marton bound}
+Suppose that Assumption~\ref{ass:ICL uniform moments} holds and that \((F_1,\ldots,F_N)\) admits a Marton coupling with mixing matrix \(\Gamma_N\). For \(\delta\in(0,1)\), define
+\begin{equation}
+\label{eq:ICL Marton penalty}
+p_N^{\mathrm M}(\delta)
+=B\|\Gamma_N\|_{\mathrm{op}}
+\sqrt{\frac{1}{2N}\log\left(\frac{2m}{\delta}\right)}.
+\end{equation}
+With probability at least \(1-\delta\),
+\begin{equation}
+\label{eq:ICL Marton bound}
+\mathcal R_N^{\mathrm{icl}}(\Theta)
+\leqslant\min_{\vartheta\in\mathcal V}
+\left\{\widehat{\mathcal R}_N^{\mathrm{icl}}(\vartheta)
++2\sqrt B\,\mathcal K_N(\vartheta,\Theta)\right\}
++p_N^{\mathrm M}(\delta).
+\end{equation}
+On the same event,
+\begin{equation}
+\label{eq:ICL root generalisation}
+\mathcal R_N^{\mathrm{icl}}(\Theta)
+\leqslant\min_{\vartheta\in\mathcal V}
+\left(\sqrt{\widehat{\mathcal R}_N^{\mathrm{icl}}(\vartheta)+p_N^{\mathrm M}(\delta)}
++\sqrt{\mathcal D_N(\vartheta,\Theta)}\right)^2.
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+Fix \(\vartheta\in\mathcal V\) and define \(f_\vartheta(F_1,\ldots,F_N)=N^{-1}\sum_i\ell_\vartheta^{\mathrm{icl}}(F_i)\). Replacing only coordinate \(i\) changes this statistic by at most \(B/N\), since both losses lie in \([0,B]\). Thus the bounded-differences vector has squared norm \(B^2/N\). Theorem~\ref{thm:Dependent bounded differences Marton} gives, for \(u>0\),
+\[
+\mathbb P\left(
+\left|\widehat{\mathcal R}_N^{\mathrm{icl}}(\vartheta)
+-\mathcal R_N^{\mathrm{icl}}(\vartheta)\right|>u\right)
+\leqslant2\exp\left(-\frac{2Nu^2}{B^2\|\Gamma_N\|_{\mathrm{op}}^2}\right).
+\]
+At \(u=p_N^{\mathrm M}(\delta)\), this is at most \(\delta/m\). A union bound gives an event \(\mathcal E_N\) with probability at least \(1-\delta\), on which
+\begin{equation}
+\label{eq:ICL simultaneous comparator event}
+\mathcal R_N^{\mathrm{icl}}(\vartheta)
+\leqslant\widehat{\mathcal R}_N^{\mathrm{icl}}(\vartheta)+p_N^{\mathrm M}(\delta)
+\qquad\text{for every }\vartheta\in\mathcal V.
+\end{equation}
+On \(\mathcal E_N\), apply \eqref{eq:ICL linear comparison} to each comparator and take the minimum, obtaining \eqref{eq:ICL Marton bound}. Applying \eqref{eq:ICL root comparison} instead and using monotonicity of the square root gives \eqref{eq:ICL root generalisation}.
+\end{proof}
+
+For one comparator specified before the task trajectory, take \(m=1\). For a finite family, the term \(\log m\) accounts for taking a minimum after observing the trajectory. A concentration statement valid separately for each comparator cannot justify an unrestricted infimum without a uniform argument. The Marton theorem itself only requires the joint coupling assumption; if the task contexts are not Markov but their conditional laws and moments are otherwise specified, this version still applies.
+
+\paragraph{An explicit mixing-time formulation.}
+
+Under Assumption~\ref{ass:ICL task dynamics}, dependence can instead be quantified through uniform mixing of the task context chain. Suppose that \(P^{\mathrm{icl}}\) has invariant law \(\pi^{\mathrm{icl}}\), and define
+\begin{align}
+t_{\mathrm{mix}}^{\mathrm{icl}}(u)
+&=\inf\left\{k\in\mathbb N:
+\sup_{F\in E}d_{\mathrm{TV}}\bigl((P^{\mathrm{icl}})^k(F,\cdot),\pi^{\mathrm{icl}}\bigr)\leqslant u\right\},
+\label{eq:ICL mixing time}\\
+\mathfrak t_{\mathrm{icl}}
+&=\inf_{0<\eta<1}t_{\mathrm{mix}}^{\mathrm{icl}}(\eta/2)
+\left(\frac{2-\eta}{1-\eta}\right)^2.
+\label{eq:ICL mixing constant}
+\end{align}
+We assume \(\mathfrak t_{\mathrm{icl}}<\infty\). By the Markov-chain bounded-differences inequality of Paulin \cite[Corollary~2.11 and Remark~2.12, arXiv version]{Paulin2015},
+\[
+\mathbb P\bigl(|f(F_1,\ldots,F_N)-\mathbb Ef|>u\bigr)
+\leqslant2\exp\left(-\frac{2u^2}{\mathfrak t_{\mathrm{icl}}\|c\|_2^2}\right)
+\]
+whenever \(f\) has bounded-differences vector \(c\). This result holds on Polish state spaces, including \(H^n\), and does not require a stationary initial law. The quantity in \eqref{eq:ICL mixing constant} is an upper bound for Paulin's optimised dependence constant.
+
+\begin{corollary}[Mixing-time in-context generalisation bound]
+\label{cor:ICL TV bound}
+Under Assumptions~\ref{ass:ICL task dynamics} and \ref{ass:ICL uniform moments}, suppose that \(\mathfrak t_{\mathrm{icl}}<\infty\). Then \eqref{eq:ICL Marton bound} and \eqref{eq:ICL root generalisation} hold with probability at least \(1-\delta\), with \(p_N^{\mathrm M}(\delta)\) replaced by
+\begin{equation}
+\label{eq:ICL TV penalty}
+p_N^{\mathrm{TV}}(\delta)
+=B\sqrt{\frac{\mathfrak t_{\mathrm{icl}}}{2N}
+\log\left(\frac{2m}{\delta}\right)}.
+\end{equation}
+Moreover, \(\mathfrak t_{\mathrm{icl}}\leqslant9t_{\mathrm{mix}}^{\mathrm{icl}}(1/4)\).
+\end{corollary}
+
+\begin{proof}
+Apply the preceding bounded-differences inequality to each \(f_\vartheta\), for which \(\|c\|_2^2=B^2/N\), and repeat the union-bound and comparison steps of Theorem~\ref{thm:ICL Marton bound}. Taking \(\eta=1/2\) in \eqref{eq:ICL mixing constant} gives the final assertion.
+\end{proof}
+
+The Marton-matrix and mixing-time bounds are alternative concentration arguments. In particular, the corollary does not assert that the matrix of an arbitrary Marton coupling satisfies \(\|\Gamma_N\|_{\mathrm{op}}^2\leqslant\mathfrak t_{\mathrm{icl}}\). Both dependence quantities describe the task data process. Ergodicity of \(P_\Theta\) alone supplies neither assumption.
+
+\paragraph{Sample complexity with a residual task error.}
+
+Define the residual
+\begin{equation}
+\label{eq:ICL residual}
+\rho_N(\Theta)=\min_{\vartheta\in\mathcal V}
+\left\{\widehat{\mathcal R}_N^{\mathrm{icl}}(\vartheta)
++2\sqrt B\,\mathcal K_N(\vartheta,\Theta)\right\}.
+\end{equation}
+It combines empirical task fit with disagreement between a comparator and the pretrained model. Neither term is forced to vanish by equality of pretraining and task data distributions.
+
+\begin{definition}[In-context sample complexity]
+\label{def:ICL sample complexity}
+For a target squared transition risk \(\varepsilon_{\mathrm{icl}}>0\), confidence \(1-\delta\), and a specified residual bound, an in-context sample-complexity bound is a sufficient number of evaluated task windows for the resulting population-risk guarantee. Explicit bounds below require all moment, comparison-family, and dependence constants to be controlled uniformly over the candidate sample sizes.
+\end{definition}
+
+\begin{proposition}[Marton and mixing-time sample complexity]
+\label{prop:ICL Marton sample complexity}
+Fix \(0\leqslant r<\varepsilon_{\mathrm{icl}}\) and \(\delta\in(0,1)\). Suppose that \(B\), \(\mathcal V\), and the relevant dependence bound are fixed across candidate sample sizes. In the Marton setting, assume \(\|\Gamma_N\|_{\mathrm{op}}\leqslant\Gamma_\star<\infty\). If
+\begin{equation}
+\label{eq:ICL Marton sample complexity}
+N\geqslant\max\left\{1,
+\left\lceil\frac{B^2\Gamma_\star^2}{2(\varepsilon_{\mathrm{icl}}-r)^2}
+\log\left(\frac{2m}{\delta}\right)\right\rceil\right\},
+\end{equation}
+then
+\begin{equation}
+\label{eq:ICL residual failure event}
+\mathbb P\left(\rho_N(\Theta)\leqslant r\ \text{and}\
+\mathcal R_N^{\mathrm{icl}}(\Theta)>\varepsilon_{\mathrm{icl}}\right)\leqslant\delta.
+\end{equation}
+In the mixing-time setting, the same conclusion holds if
+\begin{equation}
+\label{eq:ICL TV sample complexity}
+N\geqslant\max\left\{1,
+\left\lceil\frac{B^2\mathfrak t_{\mathrm{icl}}}{2(\varepsilon_{\mathrm{icl}}-r)^2}
+\log\left(\frac{2m}{\delta}\right)\right\rceil\right\}.
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+In the Marton case, the lower bound on \(N\) gives
+\[
+B\Gamma_\star\sqrt{\frac{1}{2N}\log\left(\frac{2m}{\delta}\right)}
+\leqslant\varepsilon_{\mathrm{icl}}-r.
+\]
+On the event of Theorem~\ref{thm:ICL Marton bound}, it follows that
+\(\rho_N(\Theta)\leqslant r\) implies
+\(\mathcal R_N^{\mathrm{icl}}(\Theta)\leqslant r+(\varepsilon_{\mathrm{icl}}-r)=\varepsilon_{\mathrm{icl}}\).
+Thus the event in \eqref{eq:ICL residual failure event} is contained in the concentration failure event, which has probability at most \(\delta\). Replacing the penalty by \eqref{eq:ICL TV penalty} gives the second statement.
+\end{proof}
+
+The probability statement is an implication on an event of probability at least \(1-\delta\). It does not claim that conditioning on \(\rho_N\leqslant r\) preserves this confidence level. If the residual bound holds almost surely, the usual unconditional guarantee follows. If it holds with probability at least \(1-\delta_{\mathrm{fit}}\), the failure probability for the population-risk guarantee is at most \(\delta+\delta_{\mathrm{fit}}\). Each assertion is for a prescribed \(N\); selecting \(N\) by a stopping rule requires a bound simultaneous in time.
+
+For a single comparator with zero empirical risk and zero discrepancy, \eqref{eq:ICL TV sample complexity} reduces to
+\[
+N\geqslant\max\left\{1,
+\left\lceil\frac{B^2\mathfrak t_{\mathrm{icl}}}{2\varepsilon_{\mathrm{icl}}^2}
+\log\left(\frac2\delta\right)\right\rceil\right\}.
+\]
+This is the idealised squared-loss counterpart of \cite[Proposition~6.2]{ZekriEtAl2025}. The dependence factor remains when the generalisation inequality is inverted. Zero residual is an additional fitting and model-agreement assumption, stronger than absence of distribution shift.
+
+The root comparison gives a second useful sufficient condition. Suppose that on the event of interest some comparator satisfies \(\widehat{\mathcal R}_N^{\mathrm{icl}}(\vartheta)\leqslant a\) and \(\mathcal D_N(\vartheta,\Theta)\leqslant d_0\), where \(a,d_0\geqslant0\). If
+\[
+\sqrt{\varepsilon_{\mathrm{icl}}}>\sqrt{d_0},
+\qquad g=(\sqrt{\varepsilon_{\mathrm{icl}}}-\sqrt{d_0})^2-a>0,
+\]
+then it suffices that the relevant concentration penalty be at most \(g\). Indeed, \eqref{eq:ICL root generalisation} is then bounded by \((\sqrt{a+g}+\sqrt{d_0})^2=\varepsilon_{\mathrm{icl}}\). The sample-size formulas above therefore apply with \(\varepsilon_{\mathrm{icl}}-r\) replaced by \(g\), with the same event-wise interpretation.
+
+\paragraph{Larger comparison families.}
+
+The finite-family argument has two standard uniform extensions. These make explicit the additional control needed to replace the minimum by an infimum.
+
+\begin{proposition}[Countable and covered comparison families]
+\label{prop:ICL infinite comparators}
+Assume the uniform bound \eqref{eq:ICL bounded losses} for the enlarged family, and use the mixing-time hypotheses of Corollary~\ref{cor:ICL TV bound}.
+\begin{enumerate}
+\item If \(\mathcal V\) is countable, choose deterministic weights \(w_\vartheta>0\) with \(\sum_{\vartheta\in\mathcal V}w_\vartheta\leqslant1\). With probability at least \(1-\delta\),
+\[
+\mathcal R_N^{\mathrm{icl}}(\Theta)
+\leqslant\inf_{\vartheta\in\mathcal V}
+\left\{\widehat{\mathcal R}_N^{\mathrm{icl}}(\vartheta)
++2\sqrt B\,\mathcal K_N(\vartheta,\Theta)
++B\sqrt{\frac{\mathfrak t_{\mathrm{icl}}}{2N}
+\log\left(\frac{2}{\delta w_\vartheta}\right)}\right\}.
+\]
+\item Suppose that, for a fixed \(u>0\), the loss class admits a deterministic finite \(u\)-net in supremum norm, with centres in the class and cardinality \(\mathcal N_\infty(u)\). Then, with probability at least \(1-\delta\),
+\[
+\begin{aligned}
+\mathcal R_N^{\mathrm{icl}}(\Theta)
+&\leqslant\inf_{\vartheta\in\mathcal V}
+\left\{\widehat{\mathcal R}_N^{\mathrm{icl}}(\vartheta)
++2\sqrt B\,\mathcal K_N(\vartheta,\Theta)\right\}\\
+&\quad+2u+B\sqrt{\frac{\mathfrak t_{\mathrm{icl}}}{2N}
+\log\left(\frac{2\mathcal N_\infty(u)}{\delta}\right)}.
+\end{aligned}
+\]
+For an uncountable family, assume that the displayed infimum is measurable; alternatively, interpret the conclusion as the simultaneous inequalities for all comparators on the stated measurable event.
+\end{enumerate}
+Both statements also hold with \(\mathfrak t_{\mathrm{icl}}\) replaced by \(\|\Gamma_N\|_{\mathrm{op}}^2\) under the Marton hypothesis.
+\end{proposition}
+
+\begin{proof}
+For the countable family, apply fixed-comparator concentration with failure probability \(\delta w_\vartheta\). The sum of the failure probabilities is at most \(\delta\), so the resulting bounds hold simultaneously. Apply Lemma~\ref{lem:ICL risk comparison} on that event and take the infimum.
+
+For the covered family, apply the finite-family concentration argument to the \(\mathcal N_\infty(u)\) net centres. Given any comparator, choose a centre whose loss differs by at most \(u\) everywhere. The population averages differ by at most \(u\), as do the empirical averages. Therefore, on the event for the centres,
+\[
+\mathcal R_N^{\mathrm{icl}}(\vartheta)
+\leqslant\widehat{\mathcal R}_N^{\mathrm{icl}}(\vartheta)+2u
++B\sqrt{\frac{\mathfrak t_{\mathrm{icl}}}{2N}
+\log\left(\frac{2\mathcal N_\infty(u)}{\delta}\right)}
+\]
+for every comparator. Combine this with \eqref{eq:ICL linear comparison} and take the infimum. The Marton version follows from its fixed-comparator concentration inequality.
+\end{proof}
+
+Finite covering numbers are additional assumptions. Bounded operator norms in an infinite-dimensional parameter space do not by themselves provide finite covers of the loss class in supremum norm.
+
+An alternative uses an empirical model discrepancy. This changes the quantity being compared, but only requires concentration for the fixed target model.
+
+\begin{proposition}[Comparison using empirical discrepancy]
+\label{prop:ICL empirical discrepancy}
+Define
+\[
+\widehat{\mathcal K}_N(\vartheta,\Theta)
+=\frac{\sqrt s}{N}\sum_{i=1}^N
+W_2\bigl(Q_\vartheta(F_i,\cdot),Q_\Theta(F_i,\cdot)\bigr).
+\]
+Under the mixing-time assumptions and the common loss bound, with probability at least \(1-\delta\),
+\[
+\mathcal R_N^{\mathrm{icl}}(\Theta)
+\leqslant\inf_{\vartheta\in\mathcal V}
+\left\{\widehat{\mathcal R}_N^{\mathrm{icl}}(\vartheta)
++2\sqrt B\,\widehat{\mathcal K}_N(\vartheta,\Theta)\right\}
++B\sqrt{\frac{\mathfrak t_{\mathrm{icl}}}{2N}\log\left(\frac2\delta\right)}.
+\]
+The family can be arbitrary, subject to the measurability interpretation in Proposition~\ref{prop:ICL infinite comparators}. Under the Marton hypothesis, replace \(\mathfrak t_{\mathrm{icl}}\) by \(\|\Gamma_N\|_{\mathrm{op}}^2\).
+\end{proposition}
+
+\begin{proof}
+Averaging \eqref{eq:ICL pointwise comparison} over the observed contexts yields, deterministically and simultaneously for every comparator,
+\[
+\widehat{\mathcal R}_N^{\mathrm{icl}}(\Theta)
+\leqslant\widehat{\mathcal R}_N^{\mathrm{icl}}(\vartheta)
++2\sqrt B\,\widehat{\mathcal K}_N(\vartheta,\Theta).
+\]
+Concentration for \(\Theta\) alone bounds its population risk by its empirical risk plus the displayed penalty. Combining the two inequalities proves the claim.
+\end{proof}
+
+Here there is no comparator complexity penalty because the only stochastic concentration step concerns \(\Theta\). The population-discrepancy and empirical-discrepancy results are distinct guarantees.
+
+\subsection{Wasserstein generalisation bounds and sample complexity}
+\label{subsec:ICL Wasserstein bounds}
+
+For functional dynamics, two trajectories can approach one another in the Hilbert norm without ever agreeing exactly. Uniform total-variation mixing can therefore be unavailable even when the process is contractive. We now use the metric framework of Section~\ref{subsec:Wasserstein and metric dependence}: a transportation inequality controls conditional fluctuations, while Wasserstein contraction controls the propagation of perturbations along the task trajectory.
+
+\begin{assumption}[Transportation and regularity of the task process]
+\label{ass:ICL metric assumptions}
+The contexts satisfy Assumption~\ref{ass:ICL task dynamics}. Their initial law and every \(P^{\mathrm{icl}}(F,\cdot)\) satisfy \(T_1(C)\) on \((E,\|\cdot\|_\beta)\), in the sense of Definition~\ref{def:T1 transportation inequality}, for a common finite \(C>0\). There is \(\kappa\in[0,1)\) such that
+\begin{equation}
+\label{eq:ICL metric contraction}
+W_{1,\beta}\bigl(P^{\mathrm{icl}}(F,\cdot),P^{\mathrm{icl}}(G,\cdot)\bigr)
+\leqslant\kappa\|F-G\|_\beta
+\qquad(F,G\in E).
+\end{equation}
+Moreover, there are finite constants \(L_{\mathrm{icl}}\) and \(\overline L\) such that
+\begin{align}
+W_2\bigl(Q^{\mathrm{icl}}(F,\cdot),Q^{\mathrm{icl}}(G,\cdot)\bigr)
+&\leqslant L_{\mathrm{icl}}\|F-G\|_\beta,
+\label{eq:ICL task Lipschitz}\\
+W_2\bigl(Q_\vartheta(F,\cdot),Q_\vartheta(G,\cdot)\bigr)
+&\leqslant\overline L\|F-G\|_\beta
+\qquad(\vartheta\in\mathcal V).
+\label{eq:ICL comparator Lipschitz}
+\end{align}
+Here \(W_{1,\beta}\) is the \(1\)-Wasserstein distance for the weighted context norm.
+\end{assumption}
+
+For the finite comparison family, Proposition~\ref{prop:Lipschitz continuity of the Gaussian output kernel} supplies \(\overline L=\max_{\vartheta\in\mathcal V}L_\vartheta\), where
+\[
+L_\vartheta^2=L_{m,\vartheta}^2+\sum_{k=1}^rL_{C,k,\vartheta}^2.
+\]
+The coefficient \(\kappa\) is a property of the task data kernel, whereas \(\overline L\) is a regularity bound for the comparison models. No contraction of the model inference kernel is required.
+
+\begin{lemma}[Regularity of the task transition loss]
+\label{lem:ICL Lipschitz loss}
+Under Assumptions~\ref{ass:ICL uniform moments} and \ref{ass:ICL metric assumptions}, every comparator loss is \(L_\ell\)-Lipschitz, with
+\begin{equation}
+\label{eq:ICL Lipschitz constant}
+L_\ell=2\sqrt{sB}\,(L_{\mathrm{icl}}+\overline L).
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Write \(a_\vartheta(F)=\sqrt{\ell_\vartheta^{\mathrm{icl}}(F)}\). The triangle inequality for \(W_2\), applied to the task and model laws at \(F\) and \(G\), gives
+\[
+\begin{aligned}
+|a_\vartheta(F)-a_\vartheta(G)|
+&\leqslant\sqrt s\left[
+W_2\bigl(Q^{\mathrm{icl}}(F,\cdot),Q^{\mathrm{icl}}(G,\cdot)\bigr)
++W_2\bigl(Q_\vartheta(F,\cdot),Q_\vartheta(G,\cdot)\bigr)\right]\\
+&\leqslant\sqrt s\,(L_{\mathrm{icl}}+\overline L)\|F-G\|_\beta.
+\end{aligned}
+\]
+Since \(a_\vartheta\leqslant\sqrt B\), factoring the difference of squares yields
+\[
+|\ell_\vartheta^{\mathrm{icl}}(F)-\ell_\vartheta^{\mathrm{icl}}(G)|
+\leqslant2\sqrt B\,|a_\vartheta(F)-a_\vartheta(G)|
+\leqslant L_\ell\|F-G\|_\beta.
+\]
+This is also Proposition~\ref{prop:Lipschitz continuity squared Wasserstein loss} specialised to the task kernel and the common comparison-family constants.
+\end{proof}
+
+\begin{theorem}[Wasserstein in-context generalisation bound]
+\label{thm:ICL metric bound}
+Under Assumptions~\ref{ass:ICL uniform moments} and \ref{ass:ICL metric assumptions}, let
+\begin{equation}
+\label{eq:ICL metric penalty}
+p_N^{\mathrm W}(\delta)
+=\frac{L_\ell}{1-\kappa}
+\sqrt{\frac{2C}{N}\log\left(\frac{2m}{\delta}\right)}.
+\end{equation}
+With probability at least \(1-\delta\),
+\begin{equation}
+\label{eq:ICL metric bound}
+\mathcal R_N^{\mathrm{icl}}(\Theta)
+\leqslant\min_{\vartheta\in\mathcal V}
+\left\{\widehat{\mathcal R}_N^{\mathrm{icl}}(\vartheta)
++2\sqrt B\,\mathcal K_N(\vartheta,\Theta)\right\}
++p_N^{\mathrm W}(\delta).
+\end{equation}
+On the same event, \eqref{eq:ICL root generalisation} holds with \(p_N^{\mathrm M}(\delta)\) replaced by \(p_N^{\mathrm W}(\delta)\).
+\end{theorem}
+
+\begin{proof}
+Proposition~\ref{prop:Path space transportation inequality}, based on \cite[Theorem~2.5]{DjelloutGuillinWu2004}, gives \(T_1(CN/(1-\kappa)^2)\) for the task path law in the product \(\ell_1\) metric. By Lemma~\ref{lem:ICL Lipschitz loss}, the empirical risk of each comparator is \(L_\ell/N\)-Lipschitz in this metric. Theorem~\ref{thm:Metric concentration Wasserstein data chain} therefore yields
+\[
+\mathbb P\left(
+\left|\widehat{\mathcal R}_N^{\mathrm{icl}}(\vartheta)
+-\mathcal R_N^{\mathrm{icl}}(\vartheta)\right|>u\right)
+\leqslant2\exp\left(-\frac{Nu^2(1-\kappa)^2}{2CL_\ell^2}\right).
+\]
+Taking \(u=p_N^{\mathrm W}(\delta)\) gives failure probability at most \(\delta/m\) for each comparator. A union bound supplies the simultaneous event \eqref{eq:ICL simultaneous comparator event} with this penalty. Lemma~\ref{lem:ICL risk comparison} then proves both conclusions as in Theorem~\ref{thm:ICL Marton bound}.
+\end{proof}
+
+The squared-loss theorem does not require a Lipschitz bound for the target model \(\Theta\): its risk is compared deterministically with the comparator risks, and only the latter are concentrated. Such a bound is needed if concentration is applied directly to the target loss, as in the empirical-discrepancy formulation.
+
+\begin{proposition}[Wasserstein in-context sample complexity]
+\label{prop:ICL metric sample complexity}
+Fix \(0\leqslant r<\varepsilon_{\mathrm{icl}}\) and \(\delta\in(0,1)\). Under the hypotheses of Theorem~\ref{thm:ICL metric bound}, assume that \(B,C,\kappa,L_\ell\), and \(\mathcal V\) are controlled by the same constants across candidate sample sizes. If
+\begin{equation}
+\label{eq:ICL metric sample complexity}
+N\geqslant\max\left\{1,
+\left\lceil\frac{2CL_\ell^2}{(1-\kappa)^2(\varepsilon_{\mathrm{icl}}-r)^2}
+\log\left(\frac{2m}{\delta}\right)\right\rceil\right\},
+\end{equation}
+then the failure-event bound \eqref{eq:ICL residual failure event} holds.
+\end{proposition}
+
+\begin{proof}
+The sample-size condition implies
+\[
+\frac{L_\ell}{1-\kappa}\sqrt{\frac{2C}{N}\log\left(\frac{2m}{\delta}\right)}
+\leqslant\varepsilon_{\mathrm{icl}}-r.
+\]
+On the event of Theorem~\ref{thm:ICL metric bound}, \(\rho_N(\Theta)\leqslant r\) consequently implies \(\mathcal R_N^{\mathrm{icl}}(\Theta)\leqslant\varepsilon_{\mathrm{icl}}\). The failure probability is at most \(\delta\).
+\end{proof}
+
+The same qualification concerning the residual event applies as in Proposition~\ref{prop:ICL Marton sample complexity}. The root-comparison refinement also applies, with \(\varepsilon_{\mathrm{icl}}-r\) replaced by the positive gap \(g\) defined there. These bounds retain both the one-step concentration constant \(C\) and the dependence factor \((1-\kappa)^{-2}\).
+
+\paragraph{Metric extensions to larger comparison families.}
+
+The countable and covering arguments of Proposition~\ref{prop:ICL infinite comparators} apply with the metric concentration penalty. For a countable family with common Lipschitz constant \(L_\ell\), replace its comparator-dependent penalty by
+\[
+\frac{L_\ell}{1-\kappa}\sqrt{\frac{2C}{N}\log\left(\frac{2}{\delta w_\vartheta}\right)}.
+\]
+For a finite \(u\)-net of losses whose centres share this Lipschitz bound, the uniform penalty is
+\[
+2u+\frac{L_\ell}{1-\kappa}
+\sqrt{\frac{2C}{N}\log\left(\frac{2\mathcal N_\infty(u)}{\delta}\right)}.
+\]
+The proofs are unchanged: use metric concentration for each centre or weighted comparator, then the same simultaneous comparison argument. The common moment bound and the measurability qualification remain in force.
+
+For Proposition~\ref{prop:ICL empirical discrepancy}, suppose instead that the target output law is \(L_\Theta\)-Lipschitz in \(W_2\). Concentrate the target loss with constant
+\(L_{\ell,\Theta}=2\sqrt{sB}(L_{\mathrm{icl}}+L_\Theta)\).
+The empirical-discrepancy conclusion then holds with penalty
+\[
+\frac{L_{\ell,\Theta}}{1-\kappa}
+\sqrt{\frac{2C}{N}\log\left(\frac2\delta\right)}.
+\]
+This follows by the same deterministic empirical comparison and a single application of Theorem~\ref{thm:Metric concentration Wasserstein data chain} to \(\Theta\).
+
+\paragraph{An unsquared transition-risk alternative.}
+
+The squared loss is consistent with the pretraining analysis. If the desired accuracy is an expected Wasserstein distance, it is useful to concentrate that distance directly. Define
+\begin{align}
+a_\psi(F)&=W_{2,\beta}\bigl(P^{\mathrm{icl}}(F,\cdot),P_\psi(F,\cdot)\bigr)
+=\sqrt s\,W_2\bigl(Q^{\mathrm{icl}}(F,\cdot),Q_\psi(F,\cdot)\bigr),\nonumber\\
+\widehat{\mathcal A}_N(\psi)&=\frac1N\sum_{i=1}^Na_\psi(F_i),
+\qquad
+\mathcal A_N(\psi)=\mathbb E\bigl[\widehat{\mathcal A}_N(\psi)\bigr].
+\label{eq:ICL unsquared risks}
+\end{align}
+
+\begin{proposition}[Unsquared in-context bounds and sample complexity]
+\label{prop:ICL unsquared bounds}
+Under the uniform moment assumption, set
+\[
+\rho_N^a(\Theta)=\min_{\vartheta\in\mathcal V}
+\{\widehat{\mathcal A}_N(\vartheta)+\mathcal K_N(\vartheta,\Theta)\}.
+\]
+In each respective dependence setting, with probability at least \(1-\delta\),
+\begin{equation}
+\label{eq:ICL unsquared bound}
+\mathcal A_N(\Theta)\leqslant\rho_N^a(\Theta)+q_N(\delta),
+\end{equation}
+where
+\begin{equation}
+\label{eq:ICL unsquared penalties}
+q_N(\delta)=
+\begin{cases}
+\displaystyle\sqrt B\,\|\Gamma_N\|_{\mathrm{op}}
+\sqrt{\frac{1}{2N}\log\left(\frac{2m}{\delta}\right)},&\text{Marton coupling},\\[2mm]
+\displaystyle\sqrt B\sqrt{\frac{\mathfrak t_{\mathrm{icl}}}{2N}
+\log\left(\frac{2m}{\delta}\right)},&\text{uniform TV mixing},\\[2mm]
+\displaystyle\frac{L_a}{1-\kappa}
+\sqrt{\frac{2C}{N}\log\left(\frac{2m}{\delta}\right)},&\text{metric dependence},
+\end{cases}
+\qquad L_a=\sqrt s\,(L_{\mathrm{icl}}+\overline L).
+\end{equation}
+For a deterministic \(0\leqslant r_a<\varepsilon_a\), sufficient sample sizes are respectively
+\begin{equation}
+\label{eq:ICL unsquared sample complexity}
+\begin{aligned}
+N&\geqslant\max\left\{1,\left\lceil
+\frac{B\Gamma_\star^2}{2(\varepsilon_a-r_a)^2}
+\log\left(\frac{2m}{\delta}\right)\right\rceil\right\},\\
+N&\geqslant\max\left\{1,\left\lceil
+\frac{B\mathfrak t_{\mathrm{icl}}}{2(\varepsilon_a-r_a)^2}
+\log\left(\frac{2m}{\delta}\right)\right\rceil\right\},\\
+N&\geqslant\max\left\{1,\left\lceil
+\frac{2CL_a^2}{(1-\kappa)^2(\varepsilon_a-r_a)^2}
+\log\left(\frac{2m}{\delta}\right)\right\rceil\right\}.
+\end{aligned}
+\end{equation}
+With constants uniform over candidate sample sizes, these imply
+\(\mathbb P(\rho_N^a(\Theta)\leqslant r_a\ \text{and}\ \mathcal A_N(\Theta)>\varepsilon_a)\leqslant\delta\).
+\end{proposition}
+
+\begin{proof}
+The triangle inequality gives, for every comparator,
+\[
+a_\Theta(F)\leqslant a_\vartheta(F)
++\sqrt s\,W_2\bigl(Q_\vartheta(F,\cdot),Q_\Theta(F,\cdot)\bigr).
+\]
+Integrating yields \(\mathcal A_N(\Theta)\leqslant\mathcal A_N(\vartheta)+\mathcal K_N(\vartheta,\Theta)\). Also \(0\leqslant a_\vartheta\leqslant\sqrt B\), so the bounded-differences arguments apply with bound \(\sqrt B\) in place of \(B\). Under the metric assumptions, the first step of Lemma~\ref{lem:ICL Lipschitz loss} gives Lipschitz constant \(L_a\) directly. In each case, a union bound over \(m\) comparators and the preceding comparison inequality give \eqref{eq:ICL unsquared bound}. Solving \(q_N(\delta)\leqslant\varepsilon_a-r_a\) gives the three sample-size conditions and the stated failure-event bound.
+\end{proof}
+
+For example, the target next-function accuracy
+\[
+\frac1N\sum_{i=1}^N\mathbb E
+W_2\bigl(Q^{\mathrm{icl}}(F_i,\cdot),Q_\Theta(F_i,\cdot)\bigr)
+\leqslant\varepsilon_H
+\]
+is equivalent to \(\mathcal A_N(\Theta)\leqslant\sqrt s\,\varepsilon_H\). Under zero unsquared residual, the TV-mixing sufficient bound becomes
+\[
+N\geqslant\max\left\{1,\left\lceil
+\frac{B\mathfrak t_{\mathrm{icl}}}{2s\varepsilon_H^2}
+\log\left(\frac{2m}{\delta}\right)\right\rceil\right\}.
+\]
+By contrast, Jensen's inequality gives \(\mathcal A_N(\Theta)\leqslant\sqrt{\mathcal R_N^{\mathrm{icl}}(\Theta)}\). Requiring \(\mathcal R_N^{\mathrm{icl}}(\Theta)\leqslant s\varepsilon_H^2\) through the zero-residual squared-risk bound yields an \(\varepsilon_H^{-4}\) sufficient scaling. This is a limitation of that conversion, rather than an optimality claim about learning functional transition laws.
+
+\begin{remark}[Metric concentration without a uniform moment bound]
+\label{rem:ICL unsquared unbounded}
+For the metric version of the unsquared result, uniform second moments can be replaced by pointwise membership in \(\mathcal P_2(H)\), the output-law Lipschitz bounds, and integrability of the model discrepancy. The proof uses Lipschitz continuity of \(a_\vartheta\), without squaring it. Under Assumption~\ref{ass:ICL metric assumptions}, the initial and conditional laws have finite first context moments; contraction then gives finite first moments at every evaluated time. Hence each Lipschitz \(a_\vartheta\) is integrable. If the target kernel is also Wasserstein-Lipschitz, the discrepancy is bounded by a constant plus a multiple of \(\|F\|_\beta\), and is integrable as well. The metric penalty and sample-size formula remain valid under these assumptions, even if no finite \(B\) exists.
+\end{remark}
+
+\subsection{Applications and approximation limits}
+\label{subsec:ICL applications}
+
+The assumptions above concern the task process and must be checked for that process. We first quantify dependence created by overlapping contexts, then give two metric examples. The final proposition records error floors that cannot be removed by increasing the number of evaluated windows.
+
+\begin{proposition}[Mixing of overlapping task contexts]
+\label{prop:ICL overlapping mixing}
+Suppose the task sequence is a first-order Markov chain on \(H\) with kernel \(K\), invariant law \(\pi_H\), and finite uniform mixing times \(t_{\mathrm{mix},H}(u)\). Then the context chain has invariant law
+\[
+\pi_E(\mathrm dx_0,\ldots,\mathrm dx_{n-1})
+=\pi_H(\mathrm dx_0)\prod_{j=1}^{n-1}K(x_{j-1},\mathrm dx_j),
+\]
+and
+\begin{equation}
+\label{eq:ICL overlapping mixing}
+t_{\mathrm{mix},E}(u)\leqslant n-1+t_{\mathrm{mix},H}(u).
+\end{equation}
+Consequently, \(\mathfrak t_{\mathrm{icl}}\leqslant9[n-1+t_{\mathrm{mix},H}(1/4)]\).
+\end{proposition}
+
+\begin{proof}
+Let \(\mathsf B(x,\cdot)\) be the law of a block of length \(n\) generated from first coordinate \(x\) by \(n-1\) applications of \(K\). Starting the first coordinate with law \(\pi_H\) gives \(\pi_E=\pi_H\mathsf B\). Invariance of \(\pi_H\) implies that shifting such a block and appending one transition again gives law \(\pi_E\).
+
+Starting from an arbitrary \(F=(f_0,\ldots,f_{n-1})\), after \(k\geqslant n-1\) shifts the first coordinate has law \(K^{k-n+1}(f_{n-1},\cdot)\). The rest of the block is generated by the same kernel \(\mathsf B\). Therefore
+\[
+\begin{aligned}
+d_{\mathrm{TV}}\bigl((P^{\mathrm{icl}})^k(F,\cdot),\pi_E\bigr)
+&=d_{\mathrm{TV}}\bigl(K^{k-n+1}(f_{n-1},\cdot)\mathsf B,\pi_H\mathsf B\bigr)\\
+&\leqslant d_{\mathrm{TV}}\bigl(K^{k-n+1}(f_{n-1},\cdot),\pi_H\bigr).
+\end{aligned}
+\]
+The inequality is contraction of total variation under a Markov kernel. Take the supremum over \(F\) and choose \(k=n-1+t_{\mathrm{mix},H}(u)\). The bound on \(\mathfrak t_{\mathrm{icl}}\) follows from Corollary~\ref{cor:ICL TV bound}.
+\end{proof}
+
+Adjacent contexts share \(n-1\) functions and cannot be counted as independent observations. Proposition~\ref{prop:ICL overlapping mixing} accounts for this overlap through the mixing of the context chain. If \(K(x,\cdot)=\mu(\cdot)\) for all \(x\), the underlying functions are independent and \(t_{\mathrm{mix},H}(u)=1\) for \(u<1\); the resulting bound is \(\mathfrak t_{\mathrm{icl}}\leqslant9n\), rather than an independence bound for the overlapping windows. In a different sampling design with independent contexts from separate trajectories, the direct Marton result has \(\Gamma_N=I_N\).
+
+\begin{example}[Task processes with a global minorisation]
+\label{ex:ICL Doeblin task}
+Suppose, for some \(q\in\mathbb N\), \(\alpha\in(0,1)\), and probability measure \(\nu\), that
+\[
+(P^{\mathrm{icl}})^q(F,\cdot)\geqslant\alpha\nu(\cdot)
+\qquad(F\in E).
+\]
+The Doeblin contraction argument of Theorem~\ref{thm:Uniform geometric ergodicity} gives a unique invariant law and
+\[
+\sup_Fd_{\mathrm{TV}}\bigl((P^{\mathrm{icl}})^k(F,\cdot),\pi^{\mathrm{icl}}\bigr)
+\leqslant(1-\alpha)^{\lfloor k/q\rfloor}.
+\]
+It follows that
+\[
+t_{\mathrm{mix}}^{\mathrm{icl}}(1/4)
+\leqslant q\left\lceil\frac{\log4}{-\log(1-\alpha)}\right\rceil,
+\qquad
+\mathfrak t_{\mathrm{icl}}
+\leqslant9q\left\lceil\frac{\log4}{-\log(1-\alpha)}\right\rceil.
+\]
+Indeed, the displayed number of \(q\)-step blocks makes the total-variation upper bound at most \(1/4\). If \(\alpha=1\), the task chain forgets its initial law after at most \(q\) steps, and the respective bounds are \(q\) and \(9q\).
+
+In particular, if the task conditional kernel itself has the Gaussian structure and uniform bounds of Section~\ref{subsec:Drift and minorisation ergodicity}, Proposition~\ref{prop:Global n-step minorisation} applies to that kernel, with its own constants, yielding \(q=n\) and \(\alpha=\varepsilon_{0,\mathrm{icl}}^n\). Together with the task moment bound, these constants make Corollary~\ref{cor:ICL TV bound} and Proposition~\ref{prop:ICL Marton sample complexity} explicit. Minorisation constants established only for the pretrained model cannot be substituted for the task constants.
+\end{example}
+
+\begin{example}[In-context evaluation along a heat-equation trajectory]
+\label{ex:ICL heat equation}
+Let \(H=L^2([0,1])\), and consider \(\partial_tu=\nu\partial_{xx}u\) with homogeneous Dirichlet boundary conditions, \(\nu>0\), and sampling interval \(\Delta t>0\). Write \(S_t\) for the heat semigroup and \(a=e^{-\nu\pi^2\Delta t}\in(0,1)\). Suppose \(\|u_0\|_H\leqslant R_*\) almost surely, with \(R_*>0\), and evaluate the model on successive contexts of this trajectory.
+
+Let \(\Pi_{R_*}^H\) be projection onto the closed radius-\(R_*\) ball, and define the globally specified task kernel
+\[
+Q^{\mathrm{icl}}(F,\cdot)=\delta_{S_{\Delta t}\Pi_{R_*}^Hf_{n-1}}.
+\]
+This agrees with the heat dynamics on every observed context, since the heat semigroup preserves the initial energy bound. Non-expansiveness of the projection and \(\|S_{\Delta t}\|_{\mathrm{op}}\leqslant a\) give
+\[
+M_{2,\mathrm{icl}}\leqslant a^2R_*^2,
+\qquad L_{\mathrm{icl}}\leqslant\frac{a}{\sqrt s}.
+\]
+Choose \(\beta>(1-a^2)^{-1}\) and set \(\kappa_E=(\beta^{-1}+a^2)^{1/2}<1\). For \(F,G\in E\), the deterministic shift and the semigroup bound yield
+\[
+\begin{aligned}
+W_{1,\beta}^2\bigl(P^{\mathrm{icl}}(F,\cdot),P^{\mathrm{icl}}(G,\cdot)\bigr)
+&=\sum_{j=1}^{n-1}\beta^{j-1}\|f_j-g_j\|_H^2
++s\|S_{\Delta t}(\Pi_{R_*}^Hf_{n-1}-\Pi_{R_*}^Hg_{n-1})\|_H^2\\
+&\leqslant(\beta^{-1}+a^2)\|F-G\|_\beta^2.
+\end{aligned}
+\]
+Every conditional context law is Dirac, and hence satisfies \(T_1(C_E)\) for every positive \(C_E\). The initial context is supported on the ball with squared radius
+\[
+R_E^2=R_*^2\sum_{j=0}^{n-1}\beta^ja^{2j}.
+\]
+As in Example~\ref{ex:Heat equation metric dependence}, the support diameter bound and Pinsker's inequality give \(T_1(R_E^2)\) for its law. Thus Assumption~\ref{ass:ICL metric assumptions} holds with \(C=R_E^2\), \(\kappa=\kappa_E\), and \(L_{\mathrm{icl}}=a/\sqrt s\).
+
+For a finite comparator family, the squared-loss constants can therefore be chosen as
+\[
+B=s(aR_*+\sqrt{\overline M_2})^2,
+\qquad L_\ell=2\sqrt{sB}\left(\frac{a}{\sqrt s}+\overline L\right).
+\]
+Substitution into \eqref{eq:ICL metric sample complexity} gives the sufficient bound
+\[
+N\geqslant\max\left\{1,\left\lceil
+\frac{8R_E^2sB(a/\sqrt s+\overline L)^2}
+{(1-\kappa_E)^2(\varepsilon_{\mathrm{icl}}-r)^2}
+\log\left(\frac{2m}{\delta}\right)\right\rceil\right\},
+\]
+under the residual condition of Proposition~\ref{prop:ICL metric sample complexity}.
+
+The metric argument is useful here because deterministic contraction does not imply TV mixing. The zero context is invariant, but if a nonzero heat trajectory is started deterministically, its context remains nonzero at every finite time. Its law and \(\delta_{0_E}\) then have total-variation distance one, although their Wasserstein distance tends to zero.
+\end{example}
+
+\begin{example}[A task with infinite-rank functional noise]
+\label{ex:ICL infinite rank task}
+Let \(A\in\mathcal L(H)\) satisfy \(\|A\|_{\mathrm{op}}\leqslant a<1\), let \(\Pi_R^H\) project onto the closed radius-\(R\) ball, and let \(C_\infty\in\mathcal L_1^+(H)\) be a fixed covariance, possibly of infinite rank. Starting with a deterministic initial block \(F_1=(X_1,\ldots,X_n)\), generate subsequent functions, for \(t\geqslant n\), by
+\begin{equation}
+\label{eq:ICL stochastic recursion}
+X_{t+1}=A\Pi_R^HX_t+\xi_{t+1},
+\qquad \xi_t\overset{\mathrm{iid}}\sim\mathcal N(0,C_\infty),
+\end{equation}
+with noise independent of the initial condition. The task conditional law is
+\[
+Q^{\mathrm{icl}}(F,\cdot)
+=\mathcal N(A\Pi_R^Hf_{n-1},C_\infty).
+\]
+The Gaussian moment identity and a coupling using the same noise give
+\begin{equation}
+\label{eq:ICL infinite rank constants}
+M_{2,\mathrm{icl}}\leqslant a^2R^2+\operatorname{tr}C_\infty,
+\qquad
+L_{\mathrm{icl}}\leqslant\frac{a}{\sqrt s}.
+\end{equation}
+Indeed, the mean is bounded by \(aR\), and under this coupling the difference between two outputs is the difference between their means, bounded by \(a\|f_{n-1}-g_{n-1}\|_H\).
+
+Coupling the context transitions with the same \(\xi\) similarly gives
+\[
+W_{2,\beta}^2\bigl(P^{\mathrm{icl}}(F,\cdot),P^{\mathrm{icl}}(G,\cdot)\bigr)
+\leqslant(\beta^{-1}+a^2)\|F-G\|_\beta^2.
+\]
+Since \(W_{1,\beta}\leqslant W_{2,\beta}\), choosing \(\beta>(1-a^2)^{-1}\) verifies \eqref{eq:ICL metric contraction} with \(\kappa=(\beta^{-1}+a^2)^{1/2}<1\). When \(n=1\), the shift is absent and one can use the sharper coefficient \(\kappa=a\).
+
+To verify the transportation assumption, the initial context law is Dirac. For a fixed context, the next-context law is an affine image of the Gaussian noise, with covariance operator norm \(s\|C_\infty\|_{\mathrm{op}}\) in the weighted context geometry. A Gaussian law of covariance \(C_\infty\) satisfies \(T_1(\|C_\infty\|_{\mathrm{op}})\) on \(H\). Hence the conditional context laws satisfy \(T_1(s\|C_\infty\|_{\mathrm{op}})\), and any common positive constant
+\[
+C\geqslant s\|C_\infty\|_{\mathrm{op}}
+\]
+works for the initial and conditional laws.
+
+For completeness, the Gaussian transportation fact can be obtained by spectral approximation. If \(Z\sim\mathcal N(0,C_\infty)\), let \(Z_d\) be its projection onto the first \(d\) covariance eigenvectors. The finite-dimensional Gaussian Lipschitz exponential bound gives, for every \(1\)-Lipschitz \(h:H\to\mathbb R\),
+\[
+\mathbb E\exp\bigl(\lambda[h(Z_d)-\mathbb Eh(Z_d)]\bigr)
+\leqslant\exp\left(\frac{\lambda^2}{2}\|C_\infty\|_{\mathrm{op}}\right).
+\]
+The trace-class assumption implies \(Z_d\to Z\) almost surely and in \(L^2(H)\), and thus \(\mathbb Eh(Z_d)\to\mathbb Eh(Z)\). Fatou's lemma passes the exponential bound to the limit. The exponential characterisation of \(T_1\), recalled in \cite[Theorem~1.1]{DjelloutGuillinWu2004}, proves the claim. A \(\sqrt s\)-Lipschitz affine embedding into the last context coordinate multiplies the transportation constant by \(s\).
+
+All assumptions of Theorem~\ref{thm:ICL metric bound} are therefore verified. For example, for \(n\geqslant2\), \eqref{eq:ICL metric sample complexity} applies with
+\[
+B=s\left(\sqrt{a^2R^2+\operatorname{tr}C_\infty}+\sqrt{\overline M_2}\right)^2,
+\qquad
+L_\ell=2\sqrt{sB}\left(\frac a{\sqrt s}+\overline L\right).
+\]
+The task output may have infinite-dimensional support, while the model predictions remain supported on \(S_d\). This mismatch is allowed by the Wasserstein loss, and produces the approximation restriction quantified next.
+\end{example}
+
+\begin{proposition}[Approximation floors for functional task laws]
+\label{prop:ICL approximation floors}
+Let \(\Pi_{S_d}\) be the orthogonal projection onto the model output space.
+\begin{enumerate}
+\item For every \(\mu\in\mathcal P_2(H)\) and every \(\nu\in\mathcal P_2(H)\) supported on \(S_d\),
+\begin{equation}
+\label{eq:ICL projection floor}
+W_2^2(\mu,\nu)\geqslant\int_H\|(I_H-\Pi_{S_d})y\|_H^2\,\mu(\mathrm dy).
+\end{equation}
+Consequently,
+\[
+\mathcal R_N^{\mathrm{icl}}(\Theta)
+\geqslant\frac sN\sum_{i=1}^N\mathbb E
+\int_H\|(I_H-\Pi_{S_d})y\|_H^2Q^{\mathrm{icl}}(F_i,\mathrm dy).
+\]
+\item If the task output is deterministic, \(Q^{\mathrm{icl}}(F,\cdot)=\delta_{T(F)}\), then
+\begin{equation}
+\label{eq:ICL deterministic floor}
+\begin{aligned}
+\ell_\Theta^{\mathrm{icl}}(F)
+&=s\left(\|T(F)-m_\Theta(F)\|_H^2+\operatorname{tr}C_\Theta(F)\right)\\
+&\geqslant s\left(\|(I_H-\Pi_{S_d})T(F)\|_H^2+d\sigma_0^2\right).
+\end{aligned}
+\end{equation}
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+For any \(z\in S_d\), orthogonality gives
+\[
+\|y-z\|_H^2
+=\|(I_H-\Pi_{S_d})y\|_H^2+\|\Pi_{S_d}y-z\|_H^2
+\geqslant\|(I_H-\Pi_{S_d})y\|_H^2.
+\]
+Integrating against any coupling of \(\mu\) and \(\nu\), and taking the infimum, proves \eqref{eq:ICL projection floor}. Apply it conditionally at each task context and average to obtain the risk bound.
+
+For a deterministic task output, the coupling with a Dirac measure is unique. The Gaussian second-moment identity therefore yields
+\[
+W_2^2\bigl(\delta_{T(F)},\mathcal N(m_\Theta(F),C_\Theta(F))\bigr)
+=\|T(F)-m_\Theta(F)\|_H^2+\operatorname{tr}C_\Theta(F).
+\]
+Since \(m_\Theta(F)\in S_d\), its squared mean error is at least the squared projection residual. Also \(C_\Theta(F)=\sigma_0^2\Pi_{S_d}+\sum_kc_{k,\Theta}(F)\otimes c_{k,\Theta}(F)\), so \(\operatorname{tr}C_\Theta(F)\geqslant d\sigma_0^2\). Multiplication by \(s\) proves \eqref{eq:ICL deterministic floor}.
+\end{proof}
+
+For Example~\ref{ex:ICL infinite rank task}, the conditional projection floor equals
+\[
+\|(I_H-\Pi_{S_d})A\Pi_R^Hf_{n-1}\|_H^2
++\operatorname{tr}\bigl((I_H-\Pi_{S_d})C_\infty(I_H-\Pi_{S_d})\bigr).
+\]
+In particular, if \(S_d\) is spanned by the first \(d\) covariance eigenvectors with eigenvalues \((\lambda_j)\), then the population squared transition risk is at least \(s\sum_{j>d}\lambda_j\). For deterministic heat-equation targets, the covariance floor alone gives a strictly positive loss at every context. Thus zero empirical transition risk is impossible for those tasks under the present architecture. The residual formulations above permit a nonzero error level and a target tolerance above the attainable floor.
+
+\paragraph{Scope of the in-context guarantees.}
+
+The preceding results extend the empirical-to-population comparison argument of \cite[Section~6]{ZekriEtAl2025}. At a stationary task law, with \(n\) and \(\Theta\) fixed,
+\[
+\mathcal R_N^{\mathrm{icl}}(\Theta)
+=\int_E\ell_\Theta^{\mathrm{icl}}(F)\,\pi^{\mathrm{icl}}(\mathrm dF)
+\]
+does not depend on \(N\). A decreasing concentration penalty therefore improves risk assessment; it does not by itself prove that the model estimates the task law more accurately as more windows are evaluated. To establish improvement with longer visible prompts, one would need a family \(Q_\Theta^{(n)}\), or a variable-length architecture, and bounds relating the task-fit and discrepancy terms to \(n\). The accompanying changes in \(s\), mixing times, and architectural Lipschitz constants would also have to be tracked. An ever-growing prefix does not automatically define a fixed uniformly mixing context chain.
+
+No cardinality term such as \(\log|H|\) is required: the bounds use moments, regularity, dependence, and comparison-class complexity. Applicability on an infinite-dimensional Hilbert space is nevertheless different from uniformity in the approximation dimension. With \(\sigma_0>0\) fixed, the model moment bound contains \(d\sigma_0^2\), and cannot remain bounded as \(d\to\infty\). A fully infinite-rank output model would require a trace-class covariance construction, since \(\sigma_0^2I_H\) is not trace class when \(H\) is infinite dimensional.
+
+Finally, averaging over a task family requires assumptions conditional on the task, or constants uniform over that family. Comparisons with transition-counting estimators or minimax learning rates require a specified statistical model, a common risk criterion, and a separate estimation argument. Such conclusions do not follow from concentration of a fixed model's task risk alone.
